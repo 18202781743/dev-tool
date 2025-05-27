@@ -47,14 +47,23 @@ dev-tool config git    # 编辑Git标签配置
 ```
 
 ### 2️⃣ 一键安装
-```bash
-# 💻 本地安装
-./install.sh
 
+```
 # 🌐 GitHub在线安装
 curl -sSL https://raw.githubusercontent.com/18202781743/dev-tool/main/install-from-github.sh | bash
+```
 
-# 🔄 升级工具
+### 3️⃣ 本地安装
+```bash
+# 📥 克隆仓库
+git clone https://github.com/18202781743/dev-tool.git
+cd dev-tool
+
+./install.sh
+```
+
+### 🔄 升级工具
+```bash
 dev-tool upgrade
 ```
 
