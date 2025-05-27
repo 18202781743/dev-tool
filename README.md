@@ -39,20 +39,18 @@
 
 ## 📦 快速开始
 
-### 1️⃣ 配置信息
-```bash
-# 🛠 使用config命令编辑配置
-dev-tool config crp    # 编辑CRP配置
-dev-tool config git    # 编辑Git标签配置
-
-# crp 中的
-```
-
-### 2️⃣ 一键安装
+### 1️⃣ 一键安装
 
 ```
 # 🌐 GitHub在线安装
 curl -sSL https://raw.githubusercontent.com/18202781743/dev-tool/main/install-from-github.sh | bash
+```
+
+### 2️⃣ 配置信息
+```bash
+# 🛠 使用config命令编辑配置
+dev-tool config crp    # 编辑CRP配置
+dev-tool config git    # 编辑Git标签配置
 ```
 
 ### 3️⃣ 本地安装
