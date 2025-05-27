@@ -52,7 +52,7 @@ case "$1" in
         ;;
     config)
         shift
-        CONFIG_DIR="$HOME/.config/tools"
+        CONFIG_DIR="$HOME/.config/dev-tool"
         if [[ "$1" == "crp" ]]; then
             ${EDITOR:-vi} "$CONFIG_DIR/package-crp-config.json"
         elif [[ "$1" == "git" ]]; then
