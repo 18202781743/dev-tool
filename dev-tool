@@ -2,6 +2,7 @@
 
 # 工具主目录
 TOOL_DIR="$(dirname "$(readlink -f "$0")")"
+VENV_DIR="$HOME/.local/venv"
 
 # 检查并执行 Python 脚本
 run_python_script() {
@@ -54,13 +55,54 @@ case "$1" in
         shift
         CONFIG_DIR="$HOME/.config/dev-tool"
         if [[ "$1" == "crp" ]]; then
-            ${EDITOR:-vi} "$CONFIG_DIR/package-crp-config.json"
+            if [[ "$2" == "set" && -n "$3" ]]; then
+                IFS='=' read -r key value <<< "$3"
+                # 如果是设置password，则调用genpwd生成加密密码
+                if [[ "$key" == "auth.password" ]]; then
+                    encrypted_pwd=$(source "$VENV_DIR/bin/activate" && python "$TOOL_DIR/gen-crp-pwd.py" <<< "$value" && deactivate)
+                    jq_filter=".auth.password=\"$encrypted_pwd\""
+                else
+                    # 将点号路径转换为jq路径
+                    jq_path=".${key//./.}"
+                    # 如果值是数字则不添加引号，否则添加
+                    if [[ "$value" =~ ^[0-9]+$ ]]; then
+                        jq_filter="${jq_path}=${value}"
+                    else
+                        jq_filter="${jq_path}=\"${value}\""
+                    fi
+                fi
+                jq "${jq_filter}" "$CONFIG_DIR/package-crp-config.json" > "$CONFIG_DIR/package-crp-config.json.tmp" && \
+                mv "$CONFIG_DIR/package-crp-config.json.tmp" "$CONFIG_DIR/package-crp-config.json"
+            else
+                ${EDITOR:-vi} "$CONFIG_DIR/package-crp-config.json"
+            fi
         elif [[ "$1" == "git" ]]; then
-            ${EDITOR:-vi} "$CONFIG_DIR/git-tag-config.json"
+            if [[ "$2" == "set" && -n "$3" ]]; then
+                IFS='=' read -r key value <<< "$3"
+                # 将点号路径转换为jq路径
+                jq_path=".${key//./.}"
+                # 如果值是数字则不添加引号，否则添加
+                if [[ "$value" =~ ^[0-9]+$ ]]; then
+                    jq_filter="${jq_path}=${value}"
+                else
+                    jq_filter="${jq_path}=\"${value}\""
+                fi
+                jq "${jq_filter}" "$CONFIG_DIR/git-tag-config.json" > "$CONFIG_DIR/git-tag-config.json.tmp" && \
+                mv "$CONFIG_DIR/git-tag-config.json.tmp" "$CONFIG_DIR/git-tag-config.json"
+            else
+                ${EDITOR:-vi} "$CONFIG_DIR/git-tag-config.json"
+            fi
         else
-            echo "Usage: $0 config [crp|git]"
+            echo "Usage: $0 config [crp|git] [set <key=value>]"
+            echo "Examples:"
+            echo "  $0 config crp set auth.userId=ut0000"
+            echo "  $0 config git set params.projectBranch=newbranch"
             exit 1
         fi
+        ;;
+    gen-crp-pwd)
+        shift
+        run_python_script "$TOOL_DIR/gen-crp-pwd.py" "$@"
         ;;
     upgrade)
         echo "Upgrading dev-tool..."

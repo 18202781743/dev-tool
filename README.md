@@ -44,6 +44,8 @@
 # 🛠 使用config命令编辑配置
 dev-tool config crp    # 编辑CRP配置
 dev-tool config git    # 编辑Git标签配置
+
+# crp 中的
 ```
 
 ### 2️⃣ 一键安装
