@@ -7,17 +7,6 @@ import os
 import logging
 from datetime import datetime
 
-def setup_logging():
-    logging.basicConfig(
-        level=logging.INFO,
-        format='[%(asctime)s] [%(levelname)s] %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    return logging.getLogger(__name__)
-
-
-logger = setup_logging()
-
 # 全局参数
 class ArgsInfo:
     def __init__(self):
@@ -32,6 +21,7 @@ class ArgsInfo:
         self.topicType = "test"
         self.userName = "xxxx" # crp用户名（过滤topic）
         self.token = "xxxx"
+        self.verbose = False # 是否显示详细输出
 
         # 从配置文件读取参数
         config_path = os.path.expanduser('~/.config/dev-tool/package-crp-config.json')
@@ -51,6 +41,18 @@ class ArgsInfo:
             self.projectBranch = params.get('projectBranch', self.projectBranch)
 
 argsInfo = ArgsInfo()
+
+def setup_logging():
+    level = logging.DEBUG if argsInfo.verbose else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format='[%(asctime)s] [%(levelname)s] %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    return logging.getLogger(__name__)
+
+
+logger = setup_logging()
 
 class ProjectInfo:
     name = "dtk6"
@@ -527,8 +529,12 @@ def main(argv):
     parser.add_argument('--name', type=str, default=None, help='The project name parameter')
     parser.add_argument('--branch', type=str, default=None, help='The project branch parameter')
     parser.add_argument('--tag', type=str, default=None, help='The project tag parameter')
+    parser.add_argument('--verbose', action='store_true', help='Show verbose debug output')
 
     args = parser.parse_args()
+    argsInfo.verbose = args.verbose
+    global logger
+    logger = setup_logging()  # Reinitialize logger with new level
 
     if (args.topic is not None):
         argsInfo.topicName = args.topic
