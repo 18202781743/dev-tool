@@ -41,8 +41,8 @@
 
 ### 1️⃣ 一键安装
 
+复制执行下面的命令
 ```
-# 🌐 GitHub在线安装
 curl -sSL https://raw.githubusercontent.com/18202781743/dev-tool/main/install-from-github.sh | bash
 ```
 
@@ -51,6 +51,7 @@ curl -sSL https://raw.githubusercontent.com/18202781743/dev-tool/main/install-fr
 # 🛠 使用config命令编辑配置
 dev-tool config crp    # 编辑CRP配置
 dev-tool config git    # 编辑Git标签配置
+dev-tool config crp set auth.password="xxx"  # 直接编辑
 ```
 
 ### 3️⃣ 本地安装
@@ -70,6 +71,13 @@ dev-tool upgrade
 > 💡 提示：配置文件存储在 ~/.config/dev-tool/ 目录下
 
 ---
+
+## 使用前须知
+
+1. 安装并登录github cli 工具 -> https://cli.github.com/
+2. 安装git
+3. 使用前需要正确配置dev-tool的github账户和维护者邮箱
+4. 若需要CRP打包,则需要在配置中设置CRP的账户和密码
 
 ## 🛠 使用示例
 
