@@ -248,6 +248,24 @@ def initTagPR():
 
 def createTagPR():
     try:
+        # Check if forked repo exists
+        fork_check = subprocess.run(
+            ["gh", "repo", "view", f"{argsInfo.githubID}/{argsInfo.projectName}"],
+            capture_output=True,
+            text=True
+        )
+        
+        if fork_check.returncode != 0:
+            # Fork the repo if not exists
+            logger.info(f"Forking repository {argsInfo.projectOrg}/{argsInfo.projectName}")
+            fork_result = subprocess.run(
+                ["gh", "repo", "fork", f"{argsInfo.projectOrg}/{argsInfo.projectName}", "--clone=false"],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            logger.debug(f"Fork output: {fork_result.stdout}")
+
         # Push to github
         push_result = subprocess.run(
             "git push github dev-changelog -f",
