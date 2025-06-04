@@ -1,0 +1,104 @@
+#!/bin/bash
+
+# deepin图标查找工具
+# 用法: deepin-iconfinder <图标名称>
+
+# 显示使用帮助
+show_help() {
+    echo "Usage: $0 <icon-name>"
+    echo ""
+    echo "Description:"
+    echo "  查找deepin系统中的图标文件"
+    echo ""
+    echo "Examples:"
+    echo "  $0 deepin-music"
+    echo "  $0 deepin-terminal"
+    echo "  $0 applications-multimedia"
+    echo ""
+    echo "Search order:"
+    echo "  1. 使用 dci-icon-theme 工具查找 (需要 libdtk6gui-bin 包)"
+    echo "  2. 如果未找到，使用 qtxdg-iconfinder 查找 (需要 qtxdg-dev-tools 包)"
+    echo ""
+    echo "Dependencies:"
+    echo "  sudo apt install libdtk6gui-bin qtxdg-dev-tools"
+    exit 0
+}
+
+# 检查并安装依赖
+check_dependencies() {
+    local missing_deps=()
+    local need_install=false
+    
+    # 检查 dci-icon-theme 工具
+    if [[ ! -x "/usr/libexec/dtk6/DGui/bin/dci-icon-theme" ]]; then
+        if ! dpkg -l | grep -q "^ii.*libdtk6gui-bin"; then
+            missing_deps+=("libdtk6gui-bin")
+            need_install=true
+        fi
+    fi
+    
+    # 检查 qtxdg-iconfinder 工具
+    if ! command -v qtxdg-iconfinder >/dev/null 2>&1; then
+        if ! dpkg -l | grep -q "^ii.*qtxdg-dev-tools"; then
+            missing_deps+=("qtxdg-dev-tools")
+            need_install=true
+        fi
+    fi
+    
+    # 如果有缺失的依赖，提示安装
+    if [[ "$need_install" == true ]]; then
+        echo "Error: 缺少必要的依赖包:" >&2
+        for dep in "${missing_deps[@]}"; do
+            echo "  - $dep" >&2
+        done
+        echo "" >&2
+        echo "请运行以下命令安装依赖:" >&2
+        echo "  sudo apt update && sudo apt install ${missing_deps[*]}" >&2
+        echo "" >&2
+        echo "或者手动安装:" >&2
+        for dep in "${missing_deps[@]}"; do
+            echo "  sudo apt install $dep" >&2
+        done
+        exit 1
+    fi
+}
+
+# 检查参数
+if [[ $# -eq 0 ]]; then
+    echo "Error: 请提供图标名称"
+    show_help
+fi
+
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    show_help
+fi
+
+# 检查依赖
+check_dependencies
+
+ICON_NAME="$1"
+
+# 第一步：使用 dci-icon-theme 查找
+DCI_TOOL="/usr/libexec/dtk6/DGui/bin/dci-icon-theme"
+
+if [[ -x "$DCI_TOOL" ]]; then
+    # 执行命令，直接匹配有用的输出格式: "icon-name" [ "theme" ]: "/path/to/icon.dci"
+    ICON_PATH=$("$DCI_TOOL" --find "$ICON_NAME" 2>&1 | grep -E '^".*" \[ ".*" \]: ".*"$' | grep -o ': ".*"' | sed 's/: "//; s/"$//')
+    if [[ -n "$ICON_PATH" ]]; then
+        echo "$ICON_PATH"
+        exit 0
+    fi
+fi
+
+# 第二步：使用 qtxdg-iconfinder 查找
+if command -v qtxdg-iconfinder >/dev/null 2>&1; then
+    # 过滤 qtxdg-iconfinder 输出，只保留实际的文件路径，处理前导空格
+    RESULT2=$(qtxdg-iconfinder "$ICON_NAME" 2>/dev/null | grep -v "Total loadIcon" | grep -v "^${ICON_NAME}::" | grep "/" | sed 's/^[[:space:]]*//' 2>/dev/null)
+    if [[ -n "$RESULT2" ]]; then
+        echo "$RESULT2"
+        exit 0
+    fi
+fi
+
+# 没找到图标，静默退出
+exit 1 

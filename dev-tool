@@ -19,9 +19,24 @@ run_python_script() {
     deactivate
 }
 
+# findicon 子命令实现
+run_findicon() {
+    local deepin_iconfinder="$TOOL_DIR/deepin-iconfinder"
+    
+    # 检查 deepin-iconfinder 脚本是否存在
+    if [[ ! -x "$deepin_iconfinder" ]]; then
+        echo "Error: deepin-iconfinder script not found at $deepin_iconfinder" >&2
+        echo "Please ensure the deepin-iconfinder script is in the same directory as dev-tool" >&2
+        exit 1
+    fi
+    
+    # 直接调用 deepin-iconfinder 脚本
+    exec "$deepin_iconfinder" "$@"
+}
+
 # 显示帮助信息
 show_help() {
-    echo "Usage: $0 [crp|git|config] [command] [options]"
+    echo "Usage: $0 [crp|git|config|findicon] [command] [options]"
     echo ""
     echo "Subcommands:"
     echo "  crp      Manage CRP packages (calls package-crp.py)"
@@ -30,7 +45,7 @@ show_help() {
     echo "  upgrade  Upgrade dev-tool to latest version"
     echo "  batch-crp      Batch process CRP packages (calls batch-package-crp.py)"
     echo "  batch-git      Batch process git tags (calls batch-git-tag.py)"
-    echo "Usage: $0 [crp|git|batch-crp|batch-git] [command] [options]"
+    echo "  findicon       Find deepin system icons (calls deepin-iconfinder)"
     echo ""
     echo "Examples:"
     echo "  $0 crp pack --name dtk6 --branch upstream/master"
@@ -38,6 +53,7 @@ show_help() {
     echo "  $0 config crp    # Edit CRP config"
     echo "  $0 config git    # Edit git tag config"
     echo "  $0 batch-crp --config batch-config.json"
+    echo "  $0 findicon deepin-music  # Find deepin-music icon"
     exit 0
 }
 
@@ -99,6 +115,10 @@ case "$1" in
             echo "  $0 config git set params.projectBranch=newbranch"
             exit 1
         fi
+        ;;
+    findicon)
+        shift
+        run_findicon "$@"
         ;;
     gen-crp-pwd)
         shift

@@ -21,6 +21,7 @@
           <li>CRP包管理</li>
           <li>Git标签管理</li>
           <li>批量操作</li>
+          <li>图标查找</li>
           <li>自动版本控制</li>
         </ul>
       </td>
@@ -29,6 +30,7 @@
         <ul>
           <li>一键安装</li>
           <li>配置集中管理</li>
+          <li>智能补全</li>
           <li>安全升级</li>
           <li>完善的文档</li>
         </ul>
@@ -138,6 +140,24 @@ dev-tool batch-git test --config batch-git-config.json
 dev-tool batch-git lasttag --config batch-git-config.json
 ```
 
+### 🎨 图标查找管理
+```bash
+# 🔍 查找deepin系统图标
+dev-tool findicon deepin-music
+
+# 🔍 查找应用程序图标
+dev-tool findicon deepin-terminal
+
+# 🔍 查找系统图标
+dev-tool findicon user-home
+
+# 🔍 查找主题图标
+dev-tool findicon applications-multimedia
+
+# ❓ 查看帮助信息
+dev-tool findicon --help
+```
+
 ### 🔍 常用参数
 ```bash
 # CRP参数
@@ -163,6 +183,10 @@ dev-tool batch-git lasttag --config batch-git-config.json
 --branch  分支名称 (默认: master)
 --tag     指定版本号 (不指定则自动递增)
 --reviewer 评审人员 (可多个)
+
+# findicon参数
+icon-name 图标名称 (必填)
+--help    显示帮助信息
 ```
 
 ### ⚙️ 配置管理
@@ -193,6 +217,11 @@ dev-tool config git
     <h4>📝 日志查看</h4>
     <p>操作日志保存在 ~/.cache/dev-tool.log</p>
   </div>
+  
+  <div style="flex: 1; min-width: 200px; padding: 15px; background: #f8f9fa; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1)">
+    <h4>🎨 图标依赖</h4>
+    <p>findicon功能需要安装libdtk6gui-bin和qtxdg-dev-tools包</p>
+  </div>
 </div>
 
 ---
@@ -216,9 +245,13 @@ dev-tool config git
     
     <div style="flex: 1; min-width: 200px; padding: 15px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1)">
       <h4>📖 文档改进</h4>
-      <p>帮助完善文档</p>
+      <p>完善使用文档和示例</p>
     </div>
   </div>
-  
-  <p style="text-align: center;">🎉 感谢您的贡献！</p>
 </div>
+
+---
+
+## 📄 许可证
+
+本项目使用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情

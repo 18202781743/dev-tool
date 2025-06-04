@@ -6,7 +6,7 @@ _dev-tool() {
 
     case $prev in
         dev-tool)
-            COMPREPLY=( $(compgen -W "crp git batch-git batch-crp config upgrade help" -- "$cur") )
+            COMPREPLY=( $(compgen -W "crp git batch-git batch-crp config upgrade findicon help" -- "$cur") )
             return 0
             ;;
         crp)
@@ -25,6 +25,10 @@ _dev-tool() {
             COMPREPLY=( $(compgen -W "pack test" -- "$cur") )
             return 0
             ;;
+        findicon)
+            # 只补全选项，不补全图标名称以避免误导
+            return 0
+            ;;
     esac
 
     case ${words[1]} in
@@ -39,6 +43,9 @@ _dev-tool() {
             ;;
         batch-crp)
             _dev-tool_batch_crp
+            ;;
+        findicon)
+            _dev-tool_findicon
             ;;
     esac
 }
@@ -101,6 +108,17 @@ _dev-tool_batch_crp() {
     if [[ $cur == -* ]]; then
         COMPREPLY=( $(compgen -W "--config --topic --branch --tag --help" -- "$cur") )
     fi
+}
+
+_dev-tool_findicon() {
+    local cur prev words cword
+    _init_completion || return
+
+    # 只为选项参数提供补全，不为图标名称提供补全
+    if [[ $cur == -* ]]; then
+        COMPREPLY=( $(compgen -W "--help" -- "$cur") )
+    fi
+    # 对于图标名称不提供补全，让用户自己输入
 }
 
 complete -F _dev-tool dev-tool

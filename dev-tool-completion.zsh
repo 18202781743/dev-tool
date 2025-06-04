@@ -19,6 +19,7 @@ _dev-tool() {
                 'batch-crp:Batch process CRP packages'
                 'config:Edit configuration'
                 'upgrade:Upgrade dev-tool'
+                'findicon:Find deepin system icons'
                 'help:Show help'
             )
             _describe 'command' commands
@@ -130,6 +131,11 @@ _dev-tool() {
                                 '--help[Show help]'
                             ;;
                     esac
+                    ;;
+                (findicon)
+                    _arguments \
+                        '--help[Show help]' \
+                        '*:icon-name: '
                     ;;
                 (config)
                     _arguments \

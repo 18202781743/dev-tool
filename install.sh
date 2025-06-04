@@ -72,8 +72,9 @@ if [[ ! -d "$VENV_DIR" ]]; then
 fi
 
 # 安装脚本到用户目录
-chmod +x ./dev-tool ./package-crp.py ./git-tag.py ./batch-git-tag.py ./batch-package-crp.py ./gen-crp-pwd.py
+chmod +x ./dev-tool ./deepin-iconfinder ./package-crp.py ./git-tag.py ./batch-git-tag.py ./batch-package-crp.py ./gen-crp-pwd.py
 cp ./dev-tool "$USER_BIN/dev-tool"
+cp ./deepin-iconfinder "$USER_BIN/deepin-iconfinder"
 cp ./package-crp.py "$USER_BIN/package-crp.py"
 cp ./git-tag.py "$USER_BIN/git-tag.py"
 cp ./batch-git-tag.py "$USER_BIN/batch-git-tag.py"
@@ -146,6 +147,10 @@ for pkg in packages/*; do
 done
 
 echo "##################### 安装完成 #####################"
+echo ""
+echo "已安装的工具："
+echo "  - dev-tool: 主工具"
+echo "  - deepin-iconfinder: 图标查找工具"
 echo ""
 
 # 根据当前shell自动source对应的配置文件
