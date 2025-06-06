@@ -291,6 +291,10 @@ def fetchCommitInfo(repoUrl, commit):
         )
         response.raise_for_status()
 
+        if response.status_code != 200:
+            logger.error(f"Fetch commit info failed: {response.status_code}")
+            return ""
+
         result = response.json()
         message = result.get("message", "")
         if not message:
@@ -337,7 +341,7 @@ def listBranchs(projectId, projectUrl, targetName):
                 info.commit = commit
                 info.name = name
                 info.projectId = projectId
-                info.changelog = fetchCommitInfo(projectUrl, commit)
+                info.changelog = fetchCommitInfo(projectUrl, commit) == "" and branch.get("Message", "") or fetchCommitInfo(projectUrl, commit)
                 branchs.append(info)
 
         return branchs
