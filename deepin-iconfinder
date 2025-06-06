@@ -16,11 +16,11 @@ show_help() {
     echo "  $0 applications-multimedia"
     echo ""
     echo "Search order:"
-    echo "  1. 使用 dci-icon-theme 工具查找 (需要 libdtk6gui-bin 包)"
+    echo "  1. 使用 dci-icon-theme 工具查找 (需要 libdtkgui5-bin 包)"
     echo "  2. 如果未找到，使用 qtxdg-iconfinder 查找 (需要 qtxdg-dev-tools 包)"
     echo ""
     echo "Dependencies:"
-    echo "  sudo apt install libdtk6gui-bin qtxdg-dev-tools"
+    echo "  sudo apt install libdtkgui5-bin qtxdg-dev-tools"
     exit 0
 }
 
@@ -30,9 +30,9 @@ check_dependencies() {
     local need_install=false
     
     # 检查 dci-icon-theme 工具
-    if [[ ! -x "/usr/libexec/dtk6/DGui/bin/dci-icon-theme" ]]; then
-        if ! dpkg -l | grep -q "^ii.*libdtk6gui-bin"; then
-            missing_deps+=("libdtk6gui-bin")
+    if [[ ! -x "/usr/libexec/dtk5/DGui/bin/dci-icon-theme" ]]; then
+        if ! dpkg -l | grep -q "^ii.*libdtkgui5-bin"; then
+            missing_deps+=("libdtkgui5-bin")
             need_install=true
         fi
     fi
@@ -79,7 +79,7 @@ check_dependencies
 ICON_NAME="$1"
 
 # 第一步：使用 dci-icon-theme 查找
-DCI_TOOL="/usr/libexec/dtk6/DGui/bin/dci-icon-theme"
+DCI_TOOL="/usr/libexec/dtk5/DGui/bin/dci-icon-theme"
 
 if [[ -x "$DCI_TOOL" ]]; then
     # 执行命令，直接匹配有用的输出格式: "icon-name" [ "theme" ]: "/path/to/icon.dci"
