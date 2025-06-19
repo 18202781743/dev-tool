@@ -462,6 +462,7 @@ def listCreatedInstances(topicId):
             info.Tag = instance.get("Tag", "")
             build_state = instance.get("BuildState", {})
             info.BuildState = build_state.get("state", "unknown")
+            info.BuildID = instance.get("BuildID", 0)
             instances.append(info)
 
         return instances
@@ -648,7 +649,10 @@ def main(argv):
             instances = listCreatedInstances(topic.id)
             for instance in instances:
                 colored_state = colorize_build_state(instance.BuildState)
-                logger.info(f"Instance found - Topic: {topic.name}, Project: {instance.ProjectName}, Branch: {instance.Branch}, Tag: {instance.Tag}, State: {colored_state}")
+                if instance.BuildState == "UPLOAD_OK":
+                    logger.info(f"Instance found - Topic: {topic.name}, Project: {instance.ProjectName}, Branch: {instance.Branch}, Tag: {instance.Tag}, State: {colored_state}")
+                else:
+                    logger.info(f"Instance found - Topic: {topic.name}, Project: {instance.ProjectName}, Branch: {instance.Branch}, Tag: {instance.Tag}, State: {colored_state}\n查看详情: https://shuttle.uniontech.com/#/tasks/task?taskid={instance.BuildID}")
     if (args.command == 'test'):
         instances = listInstances()
         for item in instances:
