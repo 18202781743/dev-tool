@@ -7,6 +7,66 @@ import os
 import logging
 from datetime import datetime
 
+class Colors:
+    RESET = '\033[0m'
+    RED = '\033[31m'      # 错误
+    YELLOW = '\033[33m'   # 警告
+    GREEN = '\033[32m'    # 成功信息
+    GRAY = '\033[90m'     # 调试信息
+    
+    # 背景颜色用于状态显示
+    BG_GREEN = '\033[42m'   # 绿色背景 - 成功
+    BG_RED = '\033[41m'     # 红色背景 - 失败
+    BG_YELLOW = '\033[43m'  # 黄色背景 - 进行中
+    BG_GRAY = '\033[100m'   # 灰色背景 - 未知
+    WHITE = '\033[97m'      # 白色文字，配合背景色使用
+
+class ColoredFormatter(logging.Formatter):
+    COLORS = {
+        logging.ERROR: Colors.RED,
+        logging.WARNING: Colors.YELLOW,
+        logging.INFO: Colors.GREEN,
+        logging.DEBUG: Colors.GRAY,
+    }
+
+    def format(self, record):
+        # 先格式化消息
+        formatted = super().format(record)
+        
+        # 只在终端中显示颜色，整行应用颜色
+        if hasattr(sys.stdout, 'isatty') and sys.stdout.isatty():
+            color = self.COLORS.get(record.levelno, '')
+            if color:
+                formatted = f"{color}{formatted}{Colors.RESET}"
+        
+        return formatted
+
+def colorize_build_state(state):
+    if not (hasattr(sys.stdout, 'isatty') and sys.stdout.isatty()):
+        return state
+        
+    state_str = str(state).upper()
+    
+    # 成功状态 - 绿色背景
+    if state_str in ['UPLOAD_OK', 'SUCCESS', 'OK']:
+        return f"{Colors.BG_GREEN}{Colors.WHITE} {state} {Colors.RESET}"
+    
+    # 失败状态 - 红色背景  
+    elif state_str in ['UPLOAD_GIVEUP', 'APPLY_FAILED']:
+        return f"{Colors.BG_RED}{Colors.WHITE} {state} {Colors.RESET}"
+    
+    # 进行中状态 - 黄色背景
+    elif state_str in ['APPLYING', 'UPLOADING']:
+        return f"{Colors.BG_YELLOW}{Colors.WHITE} {state} {Colors.RESET}"
+    
+    # 未知状态 - 灰色背景
+    elif state_str in ['UNKNOWN'] or not state_str:
+        return f"{Colors.BG_GRAY}{Colors.WHITE} {state} {Colors.RESET}"
+    
+    # 其他未识别状态 - 灰色背景
+    else:
+        return f"{Colors.BG_GRAY}{Colors.WHITE} {state} {Colors.RESET}"
+
 # 全局参数
 class ArgsInfo:
     def __init__(self):
@@ -44,12 +104,28 @@ argsInfo = ArgsInfo()
 
 def setup_logging():
     level = logging.DEBUG if argsInfo.verbose else logging.INFO
-    logging.basicConfig(
-        level=level,
-        format='[%(asctime)s] [%(levelname)s] %(message)s',
+    
+    # 创建logger
+    logger = logging.getLogger(__name__)
+    logger.setLevel(level)
+    
+    # 避免重复添加handler
+    if logger.handlers:
+        logger.handlers.clear()
+    
+    # 创建控制台处理器
+    handler = logging.StreamHandler()
+    handler.setLevel(level)
+    
+    # 使用彩色格式化器
+    formatter = ColoredFormatter(
+        fmt='[%(asctime)s] [%(levelname)s] %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
-    return logging.getLogger(__name__)
+    handler.setFormatter(formatter)
+    
+    logger.addHandler(handler)
+    return logger
 
 
 logger = setup_logging()
@@ -566,12 +642,13 @@ def main(argv):
     if (args.command == 'instances'):
         topics = listTopics()
         if (len(topics) == 0):
-            print("No topics found")
+            logger.warning("No topics found")
             return
         for topic in topics:
             instances = listCreatedInstances(topic.id)
             for instance in instances:
-                logger.info(f"Instance found - Topic: {topic.name}, Project: {instance.ProjectName}, Branch: {instance.Branch}, Tag: {instance.Tag}, State: {instance.BuildState}")
+                colored_state = colorize_build_state(instance.BuildState)
+                logger.info(f"Instance found - Topic: {topic.name}, Project: {instance.ProjectName}, Branch: {instance.Branch}, Tag: {instance.Tag}, State: {colored_state}")
     if (args.command == 'test'):
         instances = listInstances()
         for item in instances:

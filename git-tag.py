@@ -7,6 +7,33 @@ import logging
 import json
 from datetime import datetime
 
+class Colors:
+    RESET = '\033[0m'
+    RED = '\033[31m'      # 错误
+    YELLOW = '\033[33m'   # 警告
+    GREEN = '\033[32m'    # 成功信息
+    GRAY = '\033[90m'     # 调试信息
+
+class ColoredFormatter(logging.Formatter):
+    COLORS = {
+        logging.ERROR: Colors.RED,
+        logging.WARNING: Colors.YELLOW,
+        logging.INFO: Colors.GREEN,
+        logging.DEBUG: Colors.GRAY,
+    }
+
+    def format(self, record):
+        # 先格式化消息
+        formatted = super().format(record)
+        
+        # 只在终端中显示颜色，整行应用颜色
+        if hasattr(sys.stdout, 'isatty') and sys.stdout.isatty():
+            color = self.COLORS.get(record.levelno, '')
+            if color:
+                formatted = f"{color}{formatted}{Colors.RESET}"
+        
+        return formatted
+
 # 全局参数
 class ArgsInfo:
     def __init__(self):
@@ -40,12 +67,28 @@ argsInfo = ArgsInfo()
 
 def setup_logging():
     level = logging.DEBUG if argsInfo.verbose else logging.INFO
-    logging.basicConfig(
-        level=level,
-        format='[%(asctime)s] [%(levelname)s] %(message)s',
+    
+    # 创建logger
+    logger = logging.getLogger(__name__)
+    logger.setLevel(level)
+    
+    # 避免重复添加handler
+    if logger.handlers:
+        logger.handlers.clear()
+    
+    # 创建控制台处理器
+    handler = logging.StreamHandler()
+    handler.setLevel(level)
+    
+    # 使用彩色格式化器
+    formatter = ColoredFormatter(
+        fmt='[%(asctime)s] [%(levelname)s] %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
-    return logging.getLogger(__name__)
+    handler.setFormatter(formatter)
+    
+    logger.addHandler(handler)
+    return logger
 
 def find_config_file(filename):
     """查找配置文件，先在当前目录查找，然后在~/.config/dev-tool/packages查找"""
