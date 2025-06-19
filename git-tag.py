@@ -343,7 +343,16 @@ def createTagPR():
             capture_output=True,
             text=True
         )
-        logger.info(f"Successfully created PR for tag {argsInfo.projectTag}")
+        
+        # 提取PR链接
+        pr_url = pr_result.stdout.strip()
+        if pr_url:
+            logger.info(f"✅ Successfully created PR for tag {argsInfo.projectTag}")
+            logger.info(f"🔗 PR链接: {pr_url}")
+            print(f"\n🚀 PR已创建! 请查看: {pr_url}\n")
+        else:
+            logger.info(f"Successfully created PR for tag {argsInfo.projectTag}")
+        
         logger.debug(f"PR creation output: {pr_result.stdout}")
         
     except subprocess.CalledProcessError as e:
@@ -361,7 +370,25 @@ def mergePR():
             capture_output=True,
             text=True
         )
-        logger.info("Successfully merged PR")
+        logger.info("✅ Successfully merged PR")
+        
+        # 获取PR链接信息
+        try:
+            pr_info = subprocess.run(
+                ["gh", "pr", "view", f"{argsInfo.githubID}:dev-changelog", "--json", "url"],
+                capture_output=True,
+                text=True
+            )
+            if pr_info.returncode == 0:
+                import json
+                pr_data = json.loads(pr_info.stdout)
+                pr_url = pr_data.get('url', '')
+                if pr_url:
+                    logger.info(f"🔗 已合并的PR: {pr_url}")
+                    print(f"\n🎉 PR已成功合并! PR链接: {pr_url}\n")
+        except:
+            pass  # 如果获取失败，不影响主流程
+            
         logger.debug(f"Merge output: {merge_result.stdout}")
     except subprocess.CalledProcessError as e:
         logger.error(f"Failed to merge PR: {e.stderr}")
