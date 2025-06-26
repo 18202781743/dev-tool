@@ -41,6 +41,7 @@ _dev-tool() {
                                 'topics:List topics'
                                 'instances:List instances'
                                 'branches:List branches'
+                                'gendoc:Generate test documentation'
                             )
                             _describe 'crp command' crp_commands
                             ;;

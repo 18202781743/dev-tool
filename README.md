@@ -255,3 +255,43 @@ dev-tool config git
 ## 📄 许可证
 
 本项目使用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情
+
+## 📄 gendoc：一键生成转测文档
+
+### 功能简介
+自动根据CRP平台主题生成转测申请单（Excel），并填充release数据和repoUrls，极大提升测试文档编制效率。
+
+### 安装方法
+
+1. 安装依赖：
+   ```bash
+   pip install openpyxl
+   ```
+2. 准备模板文件 `crp-gendoc.xlsx`，可放在当前目录或 `~/.config/dev-tool/` 目录下，或通过`--template`参数指定路径。
+3. 配置CRP平台认证信息（见前文配置说明）。
+
+### 命令用法
+
+```bash
+python package-crp.py gendoc --topic <主题名称> [--template <模板路径>]
+```
+
+#### 参数说明
+- `--topic`：必填，指定需要生成转测文档的主题名称。
+- `--template`：可选，指定模板文件路径，优先级高于默认查找。
+- 其它参数如`--name`、`--branch`、`--tag`、`--verbose`同其它命令，详见前文。
+
+#### 模板查找优先级
+1. `--template`参数指定的路径（如有）。
+2. 当前目录下的 `crp-gendoc.xlsx`。
+3. `~/.config/dev-tool/crp-gendoc.xlsx`。
+
+#### 示例
+```bash
+python package-crp.py gendoc --topic DDE-V25-20250623
+python package-crp.py gendoc --topic DDE-V25-20250623 --template /path/to/crp-gendoc.xlsx
+```
+
+### 输出结果
+- 会在当前目录下生成 `测试-桌面专业版-转测申请单-<主题名>.xlsx` 文件，内容与模板一致，自动填充release数据和repoUrls。
+- 若release数据超出模板预留行数，或repoUrls获取失败，会有详细错误提示。

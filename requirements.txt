@@ -2,3 +2,4 @@ requests>=2.25.1
 python-dateutil>=2.8.1
 PyGithub>=1.55
 rsa
+openpyxl>=3.0.0

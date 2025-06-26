@@ -10,7 +10,7 @@ _dev-tool() {
             return 0
             ;;
         crp)
-            COMPREPLY=( $(compgen -W "pack test projects topics instances branches" -- "$cur") )
+            COMPREPLY=( $(compgen -W "pack test projects topics instances branches gendoc" -- "$cur") )
             return 0
             ;;
         git)
