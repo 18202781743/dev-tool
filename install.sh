@@ -60,15 +60,15 @@ if [[ ! -d "$VENV_DIR" ]]; then
     echo "Creating virtual environment at $VENV_DIR..."
     python3 -m venv "$VENV_DIR"
     
-    # 安装依赖
-    if [[ -f "$REQUIREMENTS" ]]; then
-        source "$VENV_DIR/bin/activate"
-        pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/
-        pip install -r "$REQUIREMENTS"
-        deactivate
-    else
-        echo "Warning: requirements.txt not found, skipping dependency installation"
-    fi
+fi
+# 安装依赖
+if [[ -f "$REQUIREMENTS" ]]; then
+    source "$VENV_DIR/bin/activate"
+    pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/
+    pip install -r "$REQUIREMENTS"
+    deactivate
+else
+    echo "Warning: requirements.txt not found, skipping dependency installation"
 fi
 
 # 安装脚本到用户目录
