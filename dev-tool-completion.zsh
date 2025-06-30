@@ -68,6 +68,7 @@ _dev-tool() {
                                 'merge:Merge git PR'
                                 'test:Test git tag'
                                 'lasttag:Show last git tag'
+                                'release:Trigger Auto Release workflow'
                             )
                             _describe 'git command' git_commands
                             ;;
@@ -95,6 +96,7 @@ _dev-tool() {
                                 'merge:Merge batch git PRs'
                                 'test:Test batch git tags'
                                 'lasttag:Show last batch git tags'
+                                'release:Trigger batch Auto Release workflows'
                             )
                             _describe 'batch-git command' batch_git_commands
                             ;;

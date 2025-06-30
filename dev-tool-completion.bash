@@ -14,11 +14,11 @@ _dev-tool() {
             return 0
             ;;
         git)
-            COMPREPLY=( $(compgen -W "tag merge test lasttag" -- "$cur") )
+            COMPREPLY=( $(compgen -W "tag merge test lasttag release" -- "$cur") )
             return 0
             ;;
         batch-git)
-            COMPREPLY=( $(compgen -W "tag merge test lasttag" -- "$cur") )
+            COMPREPLY=( $(compgen -W "tag merge test lasttag release" -- "$cur") )
             return 0
             ;;
         batch-crp)

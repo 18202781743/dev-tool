@@ -397,11 +397,83 @@ def mergePR():
         logger.error(f"Unexpected error in mergePR: {str(e)}")
         raise
 
+def runRelease():
+    """执行GitHub Auto Release workflow"""
+    try:
+        # 检查gh命令是否可用
+        gh_check = subprocess.run(
+            ["gh", "--version"],
+            capture_output=True,
+            text=True
+        )
+        if gh_check.returncode != 0:
+            logger.error("GitHub CLI (gh) is not installed or not available")
+            logger.error("Please install GitHub CLI: https://cli.github.com/")
+            raise SystemExit(1)
+
+        # 检查是否已登录GitHub
+        auth_check = subprocess.run(
+            ["gh", "auth", "status"],
+            capture_output=True,
+            text=True
+        )
+        if auth_check.returncode != 0:
+            logger.error("Not logged in to GitHub")
+            logger.error("Please run: gh auth login")
+            raise SystemExit(1)
+
+        # 设置默认仓库
+        repo_name = f"{argsInfo.projectOrg}/{argsInfo.projectName}"
+        logger.info(f"Setting default repository to {repo_name}")
+
+        set_default_result = subprocess.run(
+            ["gh", "repo", "set-default", repo_name],
+            capture_output=True,
+            text=True
+        )
+        if set_default_result.returncode != 0:
+            logger.warning(f"Could not set default repository: {set_default_result.stderr}")
+            logger.info("Continuing with explicit repository specification...")
+
+        # 触发Auto Release workflow
+        logger.info(f"Triggering 'Auto Release' workflow for {repo_name}")
+
+        workflow_cmd = ["gh", "workflow", "run", "Auto Release"]
+        if set_default_result.returncode != 0:
+            workflow_cmd.extend(["--repo", repo_name])
+
+        workflow_result = subprocess.run(
+            workflow_cmd,
+            capture_output=True,
+            text=True
+        )
+
+        if workflow_result.returncode == 0:
+            logger.info("✅ Successfully triggered 'Auto Release' workflow")
+            logger.info("🚀 The workflow will automatically create tags and PRs")
+            print(f"\n🎉 Auto Release workflow triggered for {repo_name}!")
+            print("📋 You can check the workflow status at:")
+            print(f"   https://github.com/{repo_name}/actions")
+        else:
+            logger.error(f"Failed to trigger 'Auto Release' workflow: {workflow_result.stderr}")
+            if "could not find workflow" in workflow_result.stderr.lower():
+                logger.error("Make sure the 'Auto Release' workflow exists in the repository")
+                logger.error("Check: https://github.com/{}/actions".format(repo_name))
+            raise SystemExit(1)
+
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Command execution failed: {e}")
+        logger.error(f"Error output: {e.stderr}")
+        raise SystemExit(1)
+    except Exception as e:
+        logger.error(f"Unexpected error in runRelease: {str(e)}")
+        raise SystemExit(1)
+
 def createOrUpdateRepo():
     dir = os.path.expanduser(argsInfo.projectRootDir)
     if not os.path.exists(dir):
         os.makedirs(dir)
-    
+
     logger.info(f"Tagging project: {dir}, {argsInfo.projectName}")
     os.chdir(dir)
 
@@ -414,7 +486,7 @@ def createOrUpdateRepo():
 
 def main(argv):
     parser = argparse.ArgumentParser(description='Pack for CRP.')
-    parser.add_argument('command', nargs='?', default='tag', choices=['tag', 'merge', 'test', 'lasttag'], help='The command type (list or pack)')
+    parser.add_argument('command', nargs='?', default='tag', choices=['tag', 'merge', 'test', 'lasttag', 'release'], help='The command type (list or pack)')
 
     parser.add_argument('--dir', type=str, default=None, help='The project directory')
     parser.add_argument('--org', type=str, default=None, help='The project organization, e.g: linuxdeepin')
@@ -446,28 +518,32 @@ def main(argv):
         argsInfo.projectReviewers = reviewers
     argsInfo.verbose = args.verbose
 
-    createOrUpdateRepo()
-    if (args.command == 'merge'):
-        mergePR()
-    elif (args.command == 'test'):
-        initTagPR()
-        try:
-            diff_result = subprocess.run(
-                "git diff HEAD^ HEAD | cat",
-                shell=True,
-                check=True,
-                capture_output=True,
-                text=True
-            )
-            print(diff_result.stdout)
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to show diff: {e.stderr}")
-    elif (args.command == 'lasttag'):
-        lastTag = fetchLastTag()
-        logger.info(f"Last Tag: {lastTag}")
+    if (args.command == 'release'):
+        # release命令不需要createOrUpdateRepo，直接执行
+        runRelease()
     else:
-        initTagPR()
-        createTagPR()
+        createOrUpdateRepo()
+        if (args.command == 'merge'):
+            mergePR()
+        elif (args.command == 'test'):
+            initTagPR()
+            try:
+                diff_result = subprocess.run(
+                    "git diff HEAD^ HEAD | cat",
+                    shell=True,
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+                print(diff_result.stdout)
+            except subprocess.CalledProcessError as e:
+                logger.error(f"Failed to show diff: {e.stderr}")
+        elif (args.command == 'lasttag'):
+            lastTag = fetchLastTag()
+            logger.info(f"Last Tag: {lastTag}")
+        else:
+            initTagPR()
+            createTagPR()
 
 if(__name__=="__main__"):
     main(sys.argv)

@@ -38,9 +38,9 @@ def run_git_tag(project: Dict, defaults: Dict, args: argparse.Namespace):
 
 def main():
     parser = argparse.ArgumentParser(description='dev-tool batch-git-tag - 批量执行git-tag')
-    parser.add_argument('command', nargs='?', default='tag', 
-                       choices=['tag', 'merge', 'test', 'lasttag'], help='执行的命令')
-    parser.add_argument('--config', default='packages/batch-git-tag.packages', 
+    parser.add_argument('command', nargs='?', default='tag',
+                       choices=['tag', 'merge', 'test', 'lasttag', 'release'], help='执行的命令')
+    parser.add_argument('--config', default='packages/batch-git-tag.packages',
                        help='配置文件路径')
     parser.add_argument('--tag', help='项目tag')
     args = parser.parse_args()

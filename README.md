@@ -131,6 +131,9 @@ dev-tool git test --name deepin-desktop-theme-v25
 # 🔍 查看最新标签
 dev-tool git lasttag --name deepin-desktop-theme-v25
 
+# 🚀 触发自动发布 (使用GitHub Auto Release workflow)
+dev-tool git release --name deepin-desktop-theme-v25 --org linuxdeepin
+
 # 🏷 批量创建标签 (使用配置文件)
 dev-tool batch-git tag --config batch-git-config.json
 
@@ -142,6 +145,9 @@ dev-tool batch-git test --config batch-git-config.json
 
 # 🔍 查看批量最新标签
 dev-tool batch-git lasttag --config batch-git-config.json
+
+# 🚀 批量触发自动发布
+dev-tool batch-git release --config batch-git-config.json
 ```
 
 ### 🎨 图标查找管理
@@ -174,12 +180,16 @@ dev-tool findicon --help
 --topic   测试主题名称 (可选)
 --branch  分支名称 (默认: upstream/master)
 
-# Git参数  
+# Git参数
 --name    项目名称 (必填)
---org     组织名称 (默认: linuxdeepin)  
+--org     组织名称 (默认: linuxdeepin)
 --branch  分支名称 (默认: master)
 --tag     指定版本号 (不指定则自动递增)
 --reviewer 评审人员 (可多个)
+
+# Git Release参数
+--name    项目名称 (必填)
+--org     组织名称 (默认: linuxdeepin)
 
 # Batch-Git参数
 --config  配置文件路径 (必填)

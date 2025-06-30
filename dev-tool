@@ -50,6 +50,7 @@ show_help() {
     echo "Examples:"
     echo "  $0 crp pack --name dtk6 --branch upstream/master"
     echo "  $0 git tag --name dtk6 --org linuxdeepin"
+    echo "  $0 git release --name dtk6 --org linuxdeepin  # Trigger Auto Release workflow"
     echo "  $0 config crp    # Edit CRP config"
     echo "  $0 config git    # Edit git tag config"
     echo "  $0 batch-crp --config batch-config.json"
