@@ -12,9 +12,20 @@ INSTALL_DIR="$HOME/.local/share/dev-tool"
 BIN_DIR="$HOME/.local/bin"
 
 # 确保必要的依赖已安装
+echo "Checking basic dependencies..."
+
+# 检查并安装git
 if ! command -v git &> /dev/null; then
     echo "Installing git..."
+    sudo apt-get update
     sudo apt-get install -y git
+fi
+
+# 检查并安装curl（用于下载）
+if ! command -v curl &> /dev/null; then
+    echo "Installing curl..."
+    sudo apt-get update
+    sudo apt-get install -y curl
 fi
 
 # 克隆或更新仓库

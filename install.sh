@@ -2,12 +2,55 @@
 
 set -e
 
-# 检查并安装python3-venv
-if ! dpkg -s python3-venv &> /dev/null; then
-    echo "Installing python3-venv..."
-    sudo apt install -y python3-venv
+# 检查并安装系统依赖
+echo "Checking system dependencies..."
+
+# 需要安装的系统依赖包
+REQUIRED_PACKAGES=(
+    "python3-venv"      # Python虚拟环境
+    "devscripts"        # 包含dch命令，用于debian changelog管理
+    "jq"               # JSON处理工具，用于配置文件编辑
+    "git"              # 版本控制工具
+    "curl"             # 用于下载和升级
+    "wget"             # 备用下载工具
+)
+
+# 检查并安装缺失的包
+MISSING_PACKAGES=()
+for package in "${REQUIRED_PACKAGES[@]}"; do
+    if ! dpkg -s "$package" &> /dev/null; then
+        MISSING_PACKAGES+=("$package")
+    fi
+done
+
+if [ ${#MISSING_PACKAGES[@]} -gt 0 ]; then
+    echo "Installing missing system dependencies: ${MISSING_PACKAGES[*]}"
+    sudo apt update
+    sudo apt install -y "${MISSING_PACKAGES[@]}"
+    echo "System dependencies installed successfully"
 else
-    echo "python3-venv is already installed, skipping..."
+    echo "All system dependencies are already installed"
+fi
+
+# 检查并安装GitHub CLI (gh)
+if ! command -v gh &> /dev/null; then
+    echo "Installing GitHub CLI (gh)..."
+    # 使用官方安装方法
+    if command -v snap &> /dev/null; then
+        # 优先使用snap安装
+        echo "Installing gh via snap..."
+        sudo snap install gh
+    else
+        # 使用apt安装
+        echo "Installing gh via apt..."
+        curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+        sudo apt update
+        sudo apt install -y gh
+    fi
+    echo "GitHub CLI installed successfully"
+else
+    echo "GitHub CLI is already installed"
 fi
 
 # 设置用户本地bin目录

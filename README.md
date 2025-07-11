@@ -76,10 +76,27 @@ dev-tool upgrade
 
 ## 使用前须知
 
-1. 安装并登录github cli 工具 -> https://cli.github.com/
-2. 安装git
-3. 使用前需要正确配置dev-tool的github账户和维护者邮箱
-4. 若需要CRP打包,则需要在配置中设置CRP的账户和密码
+### 📋 系统依赖
+安装脚本会自动安装以下系统依赖：
+
+**基础依赖：**
+- `python3-venv` - Python虚拟环境
+- `git` - 版本控制工具
+- `curl` / `wget` - 下载工具
+- `jq` - JSON处理工具（用于配置文件编辑）
+
+**Git标签功能依赖：**
+- `devscripts` - 包含dch命令，用于debian changelog管理
+- `gh` - GitHub CLI工具（用于PR管理）
+
+**图标查找功能依赖：**
+- `libdtkgui5-bin` - DTK图标主题工具
+- `qtxdg-dev-tools` - Qt图标查找工具
+
+### ⚙️ 配置要求
+1. 使用GitHub功能前需要登录GitHub CLI：`gh auth login`
+2. 使用前需要正确配置dev-tool的GitHub账户和维护者邮箱
+3. 若需要CRP打包，则需要在配置中设置CRP的账户和密码
 
 ## 🛠 使用示例
 
