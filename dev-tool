@@ -16,7 +16,9 @@ run_python_script() {
     # 在虚拟环境中执行脚本
     source "$HOME/.local/venv/bin/activate"
     python "$script" "$@"
+    local exit_code=$?
     deactivate
+    return $exit_code
 }
 
 # findicon 子命令实现

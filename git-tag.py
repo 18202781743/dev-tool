@@ -325,6 +325,9 @@ def createTagPR():
         # Prepare PR creation command
         args = [
             "gh", "pr", "create",
+            "--repo", f"{argsInfo.projectOrg}/{argsInfo.projectName}",
+            "--head", f"{argsInfo.githubID}:dev-changelog",
+            "--base", argsInfo.projectBranch,
             "--title", f"chore: bump version to {argsInfo.projectTag}",
             "--body", f"update changelog to {argsInfo.projectTag}"
         ]
@@ -365,7 +368,7 @@ def createTagPR():
 def mergePR():
     try:
         merge_result = subprocess.run(
-            ["gh", "pr", "merge", "-r", f"{argsInfo.githubID}:dev-changelog"],
+            ["gh", "pr", "merge", "--repo", f"{argsInfo.projectOrg}/{argsInfo.projectName}", "-r", f"{argsInfo.githubID}:dev-changelog"],
             check=True,
             capture_output=True,
             text=True
@@ -375,7 +378,7 @@ def mergePR():
         # 获取PR链接信息
         try:
             pr_info = subprocess.run(
-                ["gh", "pr", "view", f"{argsInfo.githubID}:dev-changelog", "--json", "url"],
+                ["gh", "pr", "view", "--repo", f"{argsInfo.projectOrg}/{argsInfo.projectName}", f"{argsInfo.githubID}:dev-changelog", "--json", "url"],
                 capture_output=True,
                 text=True
             )
