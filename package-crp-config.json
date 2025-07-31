@@ -6,7 +6,7 @@
   "params": {
     "topicType": "test",
     "archs": "amd64;arm64;loong64;sw64;mips64el",
-    "branchId": 119,
+    "branchId": 123,
     "projectBranch": "upstream/master"
   }
 }
