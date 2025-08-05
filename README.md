@@ -43,26 +43,37 @@
 
 ### 1️⃣ 一键安装
 
-复制执行下面的命令
+复制执行下面的命令进行安装
 ```
 curl -sSL https://raw.githubusercontent.com/18202781743/dev-tool/main/install-from-github.sh | bash
 ```
 
-### 2️⃣ 配置信息
+### 2️⃣ 配置必要信息
+
+如果只使用 github 打 changelog 的功能
 ```bash
-# 🛠 使用config命令编辑配置
-dev-tool config crp    # 编辑CRP配置
-dev-tool config git    # 编辑Git标签配置
-dev-tool config crp set auth.password="xxx"  # 直接编辑
+# 完善配置
+# 填写github用户名
+dev-tool config git set git.githubID="mhduiy"
+# 填写维护者信息
+dev-tool config git set git.debEmail="xxxx <xxxx@163.com>"
 ```
 
-### 3️⃣ 本地安装
-```bash
-# 📥 克隆仓库
-git clone https://github.com/18202781743/dev-tool.git
-cd dev-tool
+如果只使用 crp 打包
 
-./install.sh
+```bash
+配置crp的用户和密码
+dev-tool config crp set auth.userId="xxxxxxx"
+dev-tool config crp set auth.password="xxxx"
+```
+
+### 3️⃣ 常用命令
+```bash
+# github 生成 changelog 并自动提交一个pr(增加test参数可以打印下生成的changelog，不会提交pr)
+dev-tool git --name deepin-update-ui test --verbose
+
+# crp 打包
+dev-tool crp --topic DDE-20250801 --name xxx test
 ```
 
 ### 🔄 升级工具
