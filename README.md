@@ -162,6 +162,15 @@ dev-tool git lasttag --name deepin-desktop-theme-v25
 # 🚀 触发自动发布 (使用GitHub Auto Release workflow)
 dev-tool git release --name deepin-desktop-theme-v25 --org linuxdeepin
 
+# 🔍 搜索GitHub组织下的项目 (按更新时间排序)
+dev-tool git projects
+
+# 🔍 模糊搜索GitHub组织下的项目
+dev-tool git projects --org linuxdeepin --name dtk
+
+# 🔍 简要输出项目列表 (只显示项目名称)
+dev-tool git projects --org linuxdeepin --name dtk --quiet
+
 # 🏷 批量创建标签 (使用配置文件)
 dev-tool batch-git tag --config batch-git-config.json
 
@@ -218,6 +227,11 @@ dev-tool findicon --help
 # Git Release参数
 --name    项目名称 (必填)
 --org     组织名称 (默认: linuxdeepin)
+
+# Git Projects参数
+--org     组织名称 (默认配置: linuxdeepin)
+--name    项目名称模糊搜索 (可选)
+--quiet   简要输出结果 (只显示项目名称，不显示时间)
 
 # Batch-Git参数
 --config  配置文件路径 (必填)

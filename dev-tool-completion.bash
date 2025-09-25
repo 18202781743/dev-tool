@@ -14,11 +14,11 @@ _dev-tool() {
             return 0
             ;;
         git)
-            COMPREPLY=( $(compgen -W "tag merge test lasttag release" -- "$cur") )
+            COMPREPLY=( $(compgen -W "tag merge test lasttag release projects" -- "$cur") )
             return 0
             ;;
         batch-git)
-            COMPREPLY=( $(compgen -W "tag merge test lasttag release" -- "$cur") )
+            COMPREPLY=( $(compgen -W "tag merge test lasttag release projects" -- "$cur") )
             return 0
             ;;
         batch-crp)
@@ -76,7 +76,7 @@ _dev-tool_git() {
     esac
 
     if [[ $cur == -* ]]; then
-        COMPREPLY=( $(compgen -W "--name --org --branch --tag --reviewer --help" -- "$cur") )
+        COMPREPLY=( $(compgen -W "--name --org --branch --tag --reviewer --verbose --quiet --help" -- "$cur") )
     fi
 }
 

@@ -45,6 +45,7 @@ class ArgsInfo:
         self.projectOrg = "linuxdeepin"
         self.projectReviewers = []
         self.verbose = False # 是否显示详细输出
+        self.quiet = False # 是否静默模式（不显示时间戳）
         # 从配置文件读取参数
         self.projectRootDir = "~/.cache/git-tag-dir" # 默认值
         config_path = os.path.expanduser('~/.config/dev-tool/git-tag-config.json')
@@ -472,6 +473,88 @@ def runRelease():
         logger.error(f"Unexpected error in runRelease: {str(e)}")
         raise SystemExit(1)
 
+def searchProjects():
+    """搜索GitHub组织下的项目，支持模糊搜索并按更新时间排序"""
+    try:
+        # 构建gh命令
+        org = argsInfo.projectOrg
+        search_query = argsInfo.projectName
+        
+        if search_query:
+            # 使用gh命令进行搜索，按pushedAt排序，过滤包含搜索关键词的项目
+            jq_filter = f'.[] | select(.name | test("{search_query}"; "i")) | {{name: .name, pushedAt: .pushedAt, url: .url}}'
+        else:
+            # 获取所有仓库
+            jq_filter = '.[] | {name: .name, pushedAt: .pushedAt, url: .url}'
+
+        # 构建gh命令
+        gh_cmd = [
+            "gh", "repo", "list", org,
+            "--limit", "100",
+            "--json", "name,pushedAt,url",
+            "--jq", jq_filter
+        ]
+        
+        # 执行gh命令
+        result = subprocess.run(
+            gh_cmd,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        # 解析输出
+        repos = []
+        for line in result.stdout.strip().split('\n'):
+            if line.strip():
+                try:
+                    repo_data = json.loads(line)
+                    repos.append(repo_data)
+                except json.JSONDecodeError:
+                    continue
+        
+        if not repos:
+            return
+        
+        # 按更新时间排序（最新的在前）
+        repos.sort(key=lambda x: x['pushedAt'], reverse=True)
+        
+        # 直接输出结果，不显示总结信息
+        for repo in repos:
+            name = repo['name']
+            
+            if argsInfo.quiet:
+                # 静默模式，只输出项目名称
+                print(name)
+            else:
+                # 正常模式，输出时间和项目名称
+                pushed_at = repo['pushedAt']
+                # 格式化日期
+                try:
+                    from datetime import datetime
+                    # 解析UTC时间并转换为本地时间
+                    dt = datetime.fromisoformat(pushed_at.replace('Z', '+00:00'))
+                    # 转换为本地时间
+                    local_dt = dt.astimezone()
+                    formatted_date = local_dt.strftime('%Y-%m-%d %H:%M')
+                except:
+                    formatted_date = pushed_at[:16].replace('T', ' ')
+                
+                print(f"{formatted_date:<20} {name:<20} {repo['url']}")
+        
+    except subprocess.CalledProcessError as e:
+        if "authentication required" in e.stderr.lower() or "not logged in" in e.stderr.lower():
+            logger.error("Not logged in to GitHub")
+            logger.error("Please run: gh auth login")
+        elif "organization not found" in e.stderr.lower():
+            logger.error(f"Organization '{org}' not found or not accessible")
+        else:
+            logger.error(f"GitHub CLI error: {e.stderr}")
+        raise SystemExit(1)
+    except Exception as e:
+        logger.error(f"Unexpected error in searchProjects: {str(e)}")
+        raise SystemExit(1)
+
 def createOrUpdateRepo():
     dir = os.path.expanduser(argsInfo.projectRootDir)
     if not os.path.exists(dir):
@@ -489,7 +572,7 @@ def createOrUpdateRepo():
 
 def main(argv):
     parser = argparse.ArgumentParser(description='Pack for CRP.')
-    parser.add_argument('command', nargs='?', default='tag', choices=['tag', 'merge', 'test', 'lasttag', 'release'], help='The command type (list or pack)')
+    parser.add_argument('command', nargs='?', default='tag', choices=['tag', 'merge', 'test', 'lasttag', 'release', 'projects'], help='The command type (list or pack)')
 
     parser.add_argument('--dir', type=str, default=None, help='The project directory')
     parser.add_argument('--org', type=str, default=None, help='The project organization, e.g: linuxdeepin')
@@ -498,6 +581,7 @@ def main(argv):
     parser.add_argument('--tag', type=str, default=None, help='The project tag')
     parser.add_argument('--reviewer', type=str, default=[], nargs='+', help='The project reviewers')
     parser.add_argument('--verbose', action='store_true', help='Show verbose output for git operations')
+    parser.add_argument('--quiet', action='store_true', help='Show brief output results')
 
     if "DEBEMAIL" not in os.environ:
         os.environ["DEBEMAIL"] = argsInfo.debEmail
@@ -506,6 +590,9 @@ def main(argv):
 
     if (args.name is not None):
         argsInfo.projectName = args.name
+    elif (args.command == 'projects'):
+        # projects命令如果没有提供name参数，则清空搜索关键词
+        argsInfo.projectName = ""
     if (args.branch is not None):
         argsInfo.projectBranch = args.branch
     if (args.tag is not None):
@@ -520,10 +607,14 @@ def main(argv):
     if len(reviewers) > 0:
         argsInfo.projectReviewers = reviewers
     argsInfo.verbose = args.verbose
+    argsInfo.quiet = args.quiet
 
     if (args.command == 'release'):
         # release命令不需要createOrUpdateRepo，直接执行
         runRelease()
+    elif (args.command == 'projects'):
+        # projects命令不需要createOrUpdateRepo，直接搜索项目
+        searchProjects()
     else:
         createOrUpdateRepo()
         if (args.command == 'merge'):

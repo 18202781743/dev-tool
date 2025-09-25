@@ -69,6 +69,7 @@ _dev-tool() {
                                 'test:Test git tag'
                                 'lasttag:Show last git tag'
                                 'release:Trigger Auto Release workflow'
+                                'projects:Search GitHub organization repositories'
                             )
                             _describe 'git command' git_commands
                             ;;
@@ -79,6 +80,8 @@ _dev-tool() {
                                 '--branch[Branch name]' \
                                 '--tag[Tag name]' \
                                 '--reviewer[Reviewer]' \
+                                '--verbose[Show verbose output]' \
+                                '--quiet[Show brief output results]' \
                                 '--help[Show help]'
                             ;;
                     esac
