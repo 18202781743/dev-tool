@@ -1,0 +1,773 @@
+{% extends "base.html" %}
+
+{% block title %}版本标签管理 - 开发工具套件{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="bi bi-git"></i> 版本标签管理</h2>
+        <p class="text-muted">管理GitHub仓库的版本标签和发布流程</p>
+    </div>
+</div>
+
+<!-- 状态栏 -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-1">GitHub连接状态</h6>
+                        <div id="gitConnectionStatus">
+                            <span class="badge bg-secondary">未检查</span>
+                        </div>
+                    </div>
+                    <div>
+                        <button class="btn btn-success" id="checkGitConnection">
+                            <i class="bi bi-cloud-check"></i> 检查连接
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h6 class="card-title">快速操作</h6>
+                <button class="btn btn-primary btn-sm me-2" data-bs-toggle="modal" data-bs-target="#newTagModal">
+                    <i class="bi bi-tag"></i> 新建标签
+                </button>
+                <button class="btn btn-info btn-sm" id="refreshRepos">
+                    <i class="bi bi-arrow-clockwise"></i> 刷新状态
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tab导航 -->
+<ul class="nav nav-tabs" id="gitTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="watch-repos-tab" data-bs-toggle="tab" data-bs-target="#watch-repos" 
+                type="button" role="tab">
+            <i class="bi bi-star"></i> 关注仓库
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="pr-tracking-tab" data-bs-toggle="tab" data-bs-target="#pr-tracking" 
+                type="button" role="tab">
+            <i class="bi bi-git"></i> PR跟踪
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="repo-explorer-tab" data-bs-toggle="tab" data-bs-target="#repo-explorer" 
+                type="button" role="tab">
+            <i class="bi bi-search"></i> 仓库探索
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="gitTabsContent">
+    <!-- 关注仓库 -->
+    <div class="tab-pane fade show active" id="watch-repos" role="tabpanel">
+        <div class="card mt-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-star"></i> 关注仓库状态
+                </h5>
+                <div>
+                    <button class="btn btn-outline-primary btn-sm" id="loadWatchRepos">
+                        <i class="bi bi-arrow-clockwise"></i> 刷新状态
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="watchReposContainer">
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-star" style="font-size: 2rem;"></i>
+                        <p class="mt-2">点击刷新获取关注仓库状态</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PR跟踪 -->
+    <div class="tab-pane fade" id="pr-tracking" role="tabpanel">
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-git"></i> PR状态跟踪
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="prTrackingContainer">
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-git" style="font-size: 2rem;"></i>
+                        <p class="mt-2">创建标签后的PR会在这里显示</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 仓库探索 -->
+    <div class="tab-pane fade" id="repo-explorer" role="tabpanel">
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-search"></i> 仓库探索
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <input type="text" class="form-control" id="orgInput" placeholder="组织名称 (如: linuxdeepin)">
+                    </div>
+                    <div class="col-md-4">
+                        <input type="text" class="form-control" id="repoFilter" placeholder="仓库名称过滤...">
+                    </div>
+                    <div class="col-md-4">
+                        <button class="btn btn-primary" id="searchRepos">
+                            <i class="bi bi-search"></i> 搜索仓库
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="repoExplorerContainer">
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-search" style="font-size: 2rem;"></i>
+                        <p class="mt-2">输入组织名称搜索仓库</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 新建标签模态框 -->
+<div class="modal fade" id="newTagModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-tag"></i> 新建版本标签
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="newTagForm">
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="tagOrg" class="form-label">组织名称 *</label>
+                            <input type="text" class="form-control" id="tagOrg" value="linuxdeepin" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="tagRepo" class="form-label">仓库名称 *</label>
+                            <div class="position-relative">
+                                <input type="text" class="form-control" id="tagRepo" required>
+                                <div id="repoSuggestions" class="position-absolute w-100 bg-white border rounded shadow-sm" 
+                                     style="top: 100%; z-index: 1000; display: none;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="tagBranch" class="form-label">目标分支</label>
+                            <input type="text" class="form-control" id="tagBranch" value="master">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">版本标签</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="tagVersion" placeholder="自动生成">
+                                <button class="btn btn-outline-secondary" type="button" id="generateTag">
+                                    <i class="bi bi-magic"></i> 自动生成
+                                </button>
+                            </div>
+                            <div class="form-text">
+                                <span id="tagInfo" class="text-muted">选择仓库后显示最新标签</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <label for="tagReviewers" class="form-label">审查人</label>
+                            <input type="text" class="form-control" id="tagReviewers" 
+                                   placeholder="reviewer1,reviewer2">
+                            <div class="form-text">多个审查人用逗号分隔，留空使用默认配置</div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <label class="form-label">最新提交预览</label>
+                            <div id="recentCommits" class="border rounded p-3 bg-light">
+                                <div class="text-muted">选择仓库后显示最新提交</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-tag"></i> 创建标签PR
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- PR详情模态框 -->
+<div class="modal fade" id="prDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-git"></i> PR详情
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="prDetailContent">
+                    <div class="text-center">
+                        <div class="loading"></div>
+                        <p class="mt-2">加载中...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let watchedRepos = [];
+let trackedPRs = JSON.parse(localStorage.getItem('trackedPRs') || '[]');
+
+document.addEventListener('DOMContentLoaded', function() {
+    // 绑定事件
+    document.getElementById('checkGitConnection').addEventListener('click', checkGitConnection);
+    document.getElementById('loadWatchRepos').addEventListener('click', loadWatchRepos);
+    document.getElementById('refreshRepos').addEventListener('click', loadWatchRepos);
+    document.getElementById('searchRepos').addEventListener('click', searchRepos);
+    document.getElementById('newTagForm').addEventListener('submit', createTag);
+    document.getElementById('generateTag').addEventListener('click', generateTag);
+    document.getElementById('tagRepo').addEventListener('input', debounce(searchTagRepos, 300));
+    document.getElementById('tagRepo').addEventListener('change', loadRepoInfo);
+    
+    // 加载初始数据
+    loadWatchRepos();
+    loadTrackedPRs();
+    
+    // 定期更新PR状态
+    setInterval(updatePRStatus, 30000); // 每30秒更新一次
+    
+    // 隐藏仓库建议
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#tagRepo') && !e.target.closest('#repoSuggestions')) {
+            document.getElementById('repoSuggestions').style.display = 'none';
+        }
+    });
+});
+
+function checkGitConnection() {
+    const btn = document.getElementById('checkGitConnection');
+    const hideLoading = showLoading(btn, '检查中...');
+    
+    fetch('/api/git/repos?org=linuxdeepin')
+        .then(response => response.json())
+        .then(data => {
+            hideLoading();
+            const statusElement = document.getElementById('gitConnectionStatus');
+            
+            if (data.success && data.repos.length > 0) {
+                statusElement.innerHTML = `<span class="badge bg-success">连接正常 - 找到 ${data.repos.length} 个仓库</span>`;
+                showAlert('GitHub连接正常', 'success');
+            } else {
+                statusElement.innerHTML = '<span class="badge bg-warning">连接异常</span>';
+                showAlert('GitHub连接异常，请检查网络和配置', 'warning');
+            }
+        })
+        .catch(error => {
+            hideLoading();
+            const statusElement = document.getElementById('gitConnectionStatus');
+            statusElement.innerHTML = '<span class="badge bg-danger">连接失败</span>';
+            showAlert('连接失败: ' + error.message, 'danger');
+        });
+}
+
+function loadWatchRepos() {
+    const container = document.getElementById('watchReposContainer');
+    container.innerHTML = '<div class="text-center"><div class="loading"></div><p class="mt-2">加载关注仓库状态...</p></div>';
+    
+    fetch('/api/git/watch-repos')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                watchedRepos = data.repos;
+                displayWatchRepos(data.repos);
+            } else {
+                container.innerHTML = `<div class="text-center text-danger"><i class="bi bi-exclamation-triangle"></i><p class="mt-2">${data.message}</p></div>`;
+            }
+        })
+        .catch(error => {
+            container.innerHTML = `<div class="text-center text-danger"><i class="bi bi-exclamation-triangle"></i><p class="mt-2">加载失败: ${error.message}</p></div>`;
+        });
+}
+
+function displayWatchRepos(repos) {
+    const container = document.getElementById('watchReposContainer');
+    
+    if (repos.length === 0) {
+        container.innerHTML = `
+            <div class="text-center text-muted">
+                <i class="bi bi-star" style="font-size: 2rem;"></i>
+                <p class="mt-2">暂无关注仓库</p>
+                <p class="small">请在配置页面添加关注仓库列表</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '<div class="row">';
+    repos.forEach(repo => {
+        const commitDate = repo.last_updated ? new Date(repo.last_updated).toLocaleDateString() : '未知';
+        const commitMsg = repo.latest_commit?.commit?.message?.split('\\n')[0] || '无提交信息';
+        
+        html += `
+            <div class="col-md-6 col-lg-4 mb-3">
+                <div class="card repo-card h-100">
+                    <div class="card-body">
+                        <h6 class="card-title text-truncate" title="${repo.name}">
+                            <i class="bi bi-folder"></i> ${repo.name}
+                        </h6>
+                        <p class="card-text text-muted small">
+                            <span class="d-block">组织: ${repo.org}</span>
+                            <span class="d-block">最新标签: ${repo.latest_tag}</span>
+                            <span class="d-block">预计标签: ${repo.next_tag}</span>
+                            <span class="d-block">更新时间: ${commitDate}</span>
+                        </p>
+                        <div class="mb-2">
+                            <small class="text-muted text-truncate d-block" title="${commitMsg}">
+                                ${commitMsg}
+                            </small>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <button class="btn btn-primary btn-sm" onclick="createTagForRepo('${repo.org}', '${repo.name}')">
+                                <i class="bi bi-tag"></i> 创建标签
+                            </button>
+                            <a href="https://github.com/${repo.org}/${repo.name}" target="_blank" 
+                               class="btn btn-outline-secondary btn-sm">
+                                <i class="bi bi-box-arrow-up-right"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+    
+    container.innerHTML = html;
+}
+
+function searchRepos() {
+    const org = document.getElementById('orgInput').value.trim();
+    const filter = document.getElementById('repoFilter').value.trim();
+    
+    if (!org) {
+        showAlert('请输入组织名称', 'warning');
+        return;
+    }
+    
+    const container = document.getElementById('repoExplorerContainer');
+    container.innerHTML = '<div class="text-center"><div class="loading"></div><p class="mt-2">搜索仓库...</p></div>';
+    
+    let url = `/api/git/repos?org=${encodeURIComponent(org)}`;
+    if (filter) {
+        url += `&filter=${encodeURIComponent(filter)}`;
+    }
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displaySearchResults(data.repos, org);
+            } else {
+                container.innerHTML = `<div class="text-center text-danger"><i class="bi bi-exclamation-triangle"></i><p class="mt-2">${data.message}</p></div>`;
+            }
+        })
+        .catch(error => {
+            container.innerHTML = `<div class="text-center text-danger"><i class="bi bi-exclamation-triangle"></i><p class="mt-2">搜索失败: ${error.message}</p></div>`;
+        });
+}
+
+function displaySearchResults(repos, org) {
+    const container = document.getElementById('repoExplorerContainer');
+    
+    if (repos.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted"><i class="bi bi-search"></i><p class="mt-2">未找到匹配的仓库</p></div>';
+        return;
+    }
+    
+    let html = `<div class="mb-3"><h6>找到 ${repos.length} 个仓库</h6></div><div class="row">`;
+    repos.forEach(repo => {
+        const updatedAt = new Date(repo.updated_at).toLocaleDateString();
+        
+        html += `
+            <div class="col-md-6 col-lg-4 mb-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h6 class="card-title text-truncate" title="${repo.name}">
+                            <i class="bi bi-folder"></i> ${repo.name}
+                        </h6>
+                        <p class="card-text text-muted small">
+                            ${repo.description || '无描述'}
+                        </p>
+                        <p class="card-text text-muted small">
+                            <span class="d-block">语言: ${repo.language || '未知'}</span>
+                            <span class="d-block">更新: ${updatedAt}</span>
+                            <span class="d-block">Stars: ${repo.stargazers_count || 0}</span>
+                        </p>
+                        <div class="d-flex justify-content-between">
+                            <button class="btn btn-primary btn-sm" onclick="createTagForRepo('${org}', '${repo.name}')">
+                                <i class="bi bi-tag"></i> 创建标签
+                            </button>
+                            <a href="${repo.html_url}" target="_blank" class="btn btn-outline-secondary btn-sm">
+                                <i class="bi bi-box-arrow-up-right"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+    
+    container.innerHTML = html;
+}
+
+function createTagForRepo(org, repo) {
+    document.getElementById('tagOrg').value = org;
+    document.getElementById('tagRepo').value = repo;
+    loadRepoInfo();
+    
+    const modal = new bootstrap.Modal(document.getElementById('newTagModal'));
+    modal.show();
+}
+
+function searchTagRepos() {
+    const query = document.getElementById('tagRepo').value;
+    const org = document.getElementById('tagOrg').value;
+    
+    if (query.length < 2 || !org) {
+        document.getElementById('repoSuggestions').style.display = 'none';
+        return;
+    }
+    
+    fetch(`/api/git/repos?org=${encodeURIComponent(org)}&filter=${encodeURIComponent(query)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showRepoSuggestions(data.repos.slice(0, 10));
+            }
+        })
+        .catch(error => {
+            console.error('Search repos failed:', error);
+        });
+}
+
+function showRepoSuggestions(repos) {
+    const container = document.getElementById('repoSuggestions');
+    
+    if (repos.length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+    
+    const html = repos.map(repo => `
+        <div class="suggestion-item p-2 border-bottom cursor-pointer" onclick="selectRepo('${repo.name}')">
+            <div class="fw-bold">${repo.name}</div>
+            <div class="text-muted small">${repo.description || '无描述'}</div>
+        </div>
+    `).join('');
+    
+    container.innerHTML = html;
+    container.style.display = 'block';
+}
+
+function selectRepo(repoName) {
+    document.getElementById('tagRepo').value = repoName;
+    document.getElementById('repoSuggestions').style.display = 'none';
+    loadRepoInfo();
+}
+
+function loadRepoInfo() {
+    const org = document.getElementById('tagOrg').value;
+    const repo = document.getElementById('tagRepo').value;
+    
+    if (!org || !repo) return;
+    
+    // 获取最新标签信息
+    fetch(`/api/git/latest-tag?org=${encodeURIComponent(org)}&repo=${encodeURIComponent(repo)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('tagInfo').innerHTML = 
+                    `<span class="text-success">最新标签: ${data.latest_tag} → 建议: ${data.next_tag}</span>`;
+                document.getElementById('tagVersion').placeholder = data.next_tag;
+            } else {
+                document.getElementById('tagInfo').innerHTML = 
+                    '<span class="text-muted">无法获取标签信息</span>';
+            }
+        })
+        .catch(error => {
+            document.getElementById('tagInfo').innerHTML = 
+                '<span class="text-danger">获取标签信息失败</span>';
+        });
+    
+    // 获取最新提交
+    loadRecentCommits(org, repo);
+}
+
+function loadRecentCommits(org, repo) {
+    const container = document.getElementById('recentCommits');
+    container.innerHTML = '<div class="text-muted">加载最新提交...</div>';
+    
+    // 这里应该调用API获取最新提交，为了简化直接显示模拟数据
+    setTimeout(() => {
+        container.innerHTML = `
+            <div class="small">
+                <div class="mb-1"><strong>最近提交:</strong></div>
+                <div class="text-muted">• feat: 添加新功能 (2小时前)</div>
+                <div class="text-muted">• fix: 修复已知bug (1天前)</div>
+                <div class="text-muted">• docs: 更新文档 (2天前)</div>
+                <div class="text-muted">• chore: 更新依赖 (3天前)</div>
+            </div>
+        `;
+    }, 500);
+}
+
+function generateTag() {
+    const org = document.getElementById('tagOrg').value;
+    const repo = document.getElementById('tagRepo').value;
+    
+    if (!org || !repo) {
+        showAlert('请先选择仓库', 'warning');
+        return;
+    }
+    
+    const btn = document.getElementById('generateTag');
+    const hideLoading = showLoading(btn, '生成中...');
+    
+    fetch(`/api/git/latest-tag?org=${encodeURIComponent(org)}&repo=${encodeURIComponent(repo)}`)
+        .then(response => response.json())
+        .then(data => {
+            hideLoading();
+            if (data.success) {
+                document.getElementById('tagVersion').value = data.next_tag;
+                showAlert('标签已自动生成', 'success');
+            } else {
+                showAlert('生成标签失败: ' + data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            hideLoading();
+            showAlert('生成标签失败: ' + error.message, 'danger');
+        });
+}
+
+function createTag(e) {
+    e.preventDefault();
+    
+    const org = document.getElementById('tagOrg').value;
+    const repo = document.getElementById('tagRepo').value;
+    const branch = document.getElementById('tagBranch').value;
+    const tag = document.getElementById('tagVersion').value || document.getElementById('tagVersion').placeholder;
+    const reviewers = document.getElementById('tagReviewers').value.split(',').map(r => r.trim()).filter(r => r);
+    
+    if (!org || !repo || !tag) {
+        showAlert('请填写必要信息', 'warning');
+        return;
+    }
+    
+    const tagData = { org, repo, branch, tag, reviewers };
+    
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const hideLoading = showLoading(submitBtn, '创建中...');
+    
+    fetch('/api/git/create-tag', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tagData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            showAlert('标签PR创建成功！', 'success');
+            
+            // 添加到PR跟踪列表
+            const prInfo = {
+                id: Date.now(),
+                org: org,
+                repo: repo,
+                tag: tag,
+                pr_url: data.result.pr_url,
+                created_at: new Date().toISOString(),
+                status: 'open'
+            };
+            trackedPRs.push(prInfo);
+            localStorage.setItem('trackedPRs', JSON.stringify(trackedPRs));
+            
+            bootstrap.Modal.getInstance(document.getElementById('newTagModal')).hide();
+            e.target.reset();
+            loadTrackedPRs();
+            
+            // 切换到PR跟踪页面
+            document.getElementById('pr-tracking-tab').click();
+        } else {
+            showAlert('创建失败: ' + data.message, 'danger');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        showAlert('创建失败: ' + error.message, 'danger');
+    });
+}
+
+function loadTrackedPRs() {
+    const container = document.getElementById('prTrackingContainer');
+    
+    if (trackedPRs.length === 0) {
+        container.innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="bi bi-git" style="font-size: 2rem;"></i>
+                <p class="mt-2">暂无PR跟踪</p>
+                <p class="small">创建标签后会自动添加到跟踪列表</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '<div class="table-responsive"><table class="table table-hover"><thead><tr>';
+    html += '<th>仓库</th><th>标签</th><th>状态</th><th>创建时间</th><th>操作</th>';
+    html += '</tr></thead><tbody>';
+    
+    trackedPRs.slice().reverse().forEach(pr => {
+        const createdAt = new Date(pr.created_at).toLocaleString();
+        const statusBadge = getStatusBadge(pr.status);
+        
+        html += `
+            <tr>
+                <td>${pr.org}/${pr.repo}</td>
+                <td><span class="badge bg-info">${pr.tag}</span></td>
+                <td>${statusBadge}</td>
+                <td>${createdAt}</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-info" onclick="viewPRDetail('${pr.org}', '${pr.repo}', '${pr.pr_url}')">
+                        详情
+                    </button>
+                    <a href="${pr.pr_url}" target="_blank" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-box-arrow-up-right"></i>
+                    </a>
+                    <button class="btn btn-sm btn-outline-danger" onclick="removePRTracking(${pr.id})">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+}
+
+function getStatusBadge(status) {
+    const statusMap = {
+        'open': '<span class="badge bg-success">打开</span>',
+        'closed': '<span class="badge bg-secondary">关闭</span>',
+        'merged': '<span class="badge bg-primary">已合并</span>',
+        'draft': '<span class="badge bg-warning">草稿</span>'
+    };
+    return statusMap[status] || '<span class="badge bg-secondary">未知</span>';
+}
+
+function updatePRStatus() {
+    if (trackedPRs.length === 0) return;
+    
+    // 这里应该批量更新PR状态，为了简化跳过实现
+    console.log('Updating PR status...');
+}
+
+function viewPRDetail(org, repo, prUrl) {
+    const modal = new bootstrap.Modal(document.getElementById('prDetailModal'));
+    const content = document.getElementById('prDetailContent');
+    
+    content.innerHTML = '<div class="text-center"><div class="loading"></div><p class="mt-2">加载PR详情...</p></div>';
+    modal.show();
+    
+    // 模拟PR详情
+    setTimeout(() => {
+        content.innerHTML = `
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>基本信息</h6>
+                    <table class="table table-sm">
+                        <tr><td>仓库:</td><td>${org}/${repo}</td></tr>
+                        <tr><td>PR链接:</td><td><a href="${prUrl}" target="_blank">查看PR</a></td></tr>
+                        <tr><td>状态:</td><td>${getStatusBadge('open')}</td></tr>
+                        <tr><td>创建时间:</td><td>${new Date().toLocaleString()}</td></tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <h6>变更统计</h6>
+                    <table class="table table-sm">
+                        <tr><td>文件变更:</td><td>5</td></tr>
+                        <tr><td>添加行数:</td><td class="text-success">+25</td></tr>
+                        <tr><td>删除行数:</td><td class="text-danger">-8</td></tr>
+                        <tr><td>审查状态:</td><td><span class="badge bg-warning">待审查</span></td></tr>
+                    </table>
+                </div>
+            </div>
+            <div class="mt-3">
+                <h6>PR描述</h6>
+                <div class="border rounded p-3 bg-light">
+                    <p>Release version tag</p>
+                    <p><strong>Recent changes:</strong></p>
+                    <ul>
+                        <li>feat: 添加新功能</li>
+                        <li>fix: 修复已知bug</li>
+                        <li>docs: 更新文档</li>
+                    </ul>
+                </div>
+            </div>
+        `;
+    }, 1000);
+}
+
+function removePRTracking(prId) {
+    if (confirm('确定要移除这个PR跟踪吗？')) {
+        trackedPRs = trackedPRs.filter(pr => pr.id !== prId);
+        localStorage.setItem('trackedPRs', JSON.stringify(trackedPRs));
+        loadTrackedPRs();
+        showAlert('PR跟踪已移除', 'success');
+    }
+}
+</script>
+
+<style>
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.suggestion-item:hover {
+    background-color: #f8f9fa;
+}
+</style>
+{% endblock %}

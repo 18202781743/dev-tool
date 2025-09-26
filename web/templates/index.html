@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}主页 - 开发工具套件{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="jumbotron bg-gradient-primary text-white rounded p-5 mb-4">
+            <h1 class="display-4">
+                <i class="bi bi-tools"></i> 开发工具套件 Web版
+            </h1>
+            <p class="lead">一个高效管理CRP打包流程和Git标签的Web工具集合</p>
+            <hr class="my-4">
+            <p>提供直观的Web界面来管理您的开发工作流程</p>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- CRP打包功能 -->
+    <div class="col-md-6 mb-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body text-center">
+                <div class="mb-3">
+                    <i class="bi bi-box text-primary" style="font-size: 3rem;"></i>
+                </div>
+                <h4 class="card-title">CRP打包管理</h4>
+                <p class="card-text">
+                    管理CRP打包流程，查看主题列表，创建打包任务，支持批量操作。
+                </p>
+                <ul class="list-unstyled text-start">
+                    <li><i class="bi bi-check-circle text-success"></i> 主题管理</li>
+                    <li><i class="bi bi-check-circle text-success"></i> 打包状态跟踪</li>
+                    <li><i class="bi bi-check-circle text-success"></i> 批量打包</li>
+                    <li><i class="bi bi-check-circle text-success"></i> 架构选择</li>
+                </ul>
+                <a href="{{ url_for('crp_page') }}" class="btn btn-primary">
+                    <i class="bi bi-arrow-right"></i> 进入CRP管理
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Git标签管理功能 -->
+    <div class="col-md-6 mb-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body text-center">
+                <div class="mb-3">
+                    <i class="bi bi-git text-success" style="font-size: 3rem;"></i>
+                </div>
+                <h4 class="card-title">版本标签管理</h4>
+                <p class="card-text">
+                    管理Git仓库标签，自动生成changelog，创建PR并跟踪状态。
+                </p>
+                <ul class="list-unstyled text-start">
+                    <li><i class="bi bi-check-circle text-success"></i> 仓库状态监控</li>
+                    <li><i class="bi bi-check-circle text-success"></i> 自动标签生成</li>
+                    <li><i class="bi bi-check-circle text-success"></i> PR状态跟踪</li>
+                    <li><i class="bi bi-check-circle text-success"></i> 批量标签管理</li>
+                </ul>
+                <a href="{{ url_for('git_page') }}" class="btn btn-success">
+                    <i class="bi bi-arrow-right"></i> 进入版本管理
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 快速状态 -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-speedometer2"></i> 快速状态
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 text-center">
+                        <div class="border rounded p-3">
+                            <h6 class="text-muted">CRP连接状态</h6>
+                            <div id="crpStatus" class="h5">
+                                <span class="badge bg-secondary">未检查</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <div class="border rounded p-3">
+                            <h6 class="text-muted">GitHub连接状态</h6>
+                            <div id="gitStatus" class="h5">
+                                <span class="badge bg-secondary">未检查</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <div class="border rounded p-3">
+                            <h6 class="text-muted">配置状态</h6>
+                            <div id="configStatus" class="h5">
+                                <span class="badge bg-secondary">未检查</span>
+                            </div>
+                            <div class="mt-2">
+                                <a href="{{ url_for('config_page') }}" class="btn btn-sm btn-outline-primary">
+                                    配置设置
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 检查各种状态
+document.addEventListener('DOMContentLoaded', function() {
+    checkSystemStatus();
+});
+
+function checkSystemStatus() {
+    // 检查配置状态
+    checkConfigStatus();
+}
+
+function checkConfigStatus() {
+    // 检查CRP配置
+    fetch('/api/config/crp')
+        .then(response => response.json())
+        .then(data => {
+            const crpStatus = document.getElementById('crpStatus');
+            const hasAuth = data.auth && data.auth.userId && data.auth.password;
+            if (hasAuth) {
+                crpStatus.innerHTML = '<span class="badge bg-success">已配置</span>';
+            } else {
+                crpStatus.innerHTML = '<span class="badge bg-warning">需要配置</span>';
+            }
+        })
+        .catch(error => {
+            console.error('Error checking CRP config:', error);
+        });
+
+    // 检查Git配置
+    fetch('/api/config/git')
+        .then(response => response.json())
+        .then(data => {
+            const gitStatus = document.getElementById('gitStatus');
+            const hasAuth = data.auth && data.auth.githubID && data.auth.debEmail;
+            if (hasAuth) {
+                gitStatus.innerHTML = '<span class="badge bg-success">已配置</span>';
+            } else {
+                gitStatus.innerHTML = '<span class="badge bg-warning">需要配置</span>';
+            }
+        })
+        .catch(error => {
+            console.error('Error checking Git config:', error);
+        });
+
+    // 总体配置状态
+    setTimeout(() => {
+        const crpOk = document.querySelector('#crpStatus .bg-success');
+        const gitOk = document.querySelector('#gitStatus .bg-success');
+        const configStatus = document.getElementById('configStatus');
+        
+        if (crpOk && gitOk) {
+            configStatus.innerHTML = '<span class="badge bg-success">完整配置</span><div class="mt-2"><a href="/config" class="btn btn-sm btn-outline-primary">配置设置</a></div>';
+        } else if (crpOk || gitOk) {
+            configStatus.innerHTML = '<span class="badge bg-warning">部分配置</span><div class="mt-2"><a href="/config" class="btn btn-sm btn-warning">完善配置</a></div>';
+        } else {
+            configStatus.innerHTML = '<span class="badge bg-danger">需要配置</span><div class="mt-2"><a href="/config" class="btn btn-sm btn-danger">立即配置</a></div>';
+        }
+    }, 500);
+}
+</script>
+{% endblock %}

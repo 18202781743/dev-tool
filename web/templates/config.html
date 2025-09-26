@@ -1,0 +1,521 @@
+{% extends "base.html" %}
+
+{% block title %}配置管理 - 开发工具套件{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="bi bi-gear"></i> 配置管理</h2>
+        <p class="text-muted">配置CRP和Git相关参数</p>
+    </div>
+</div>
+
+<!-- Tab导航 -->
+<ul class="nav nav-tabs" id="configTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="crp-tab" data-bs-toggle="tab" data-bs-target="#crp-config" 
+                type="button" role="tab">
+            <i class="bi bi-box"></i> CRP配置
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="git-tab" data-bs-toggle="tab" data-bs-target="#git-config" 
+                type="button" role="tab">
+            <i class="bi bi-git"></i> Git配置
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="configTabsContent">
+    <!-- CRP配置 -->
+    <div class="tab-pane fade show active" id="crp-config" role="tabpanel">
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0">CRP打包配置</h5>
+            </div>
+            <div class="card-body">
+                <form id="crpConfigForm">
+                    <!-- 认证信息 -->
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <h6 class="text-primary">认证信息</h6>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="crpUserId" class="form-label">用户ID *</label>
+                            <input type="text" class="form-control" id="crpUserId" name="userId" required>
+                            <div class="form-text">CRP系统的用户名</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="crpPassword" class="form-label">密码 *</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="crpPassword" name="password" placeholder="输入新密码（留空保持不变）">
+                                <button class="btn btn-outline-secondary" type="button" id="showPassword">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                            <div class="form-text">密码会自动加密存储，留空则保持现有密码不变</div>
+                        </div>
+                    </div>
+
+                    <!-- 打包参数 -->
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <h6 class="text-primary">打包参数</h6>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="topicType" class="form-label">主题类型</label>
+                            <select class="form-select" id="topicType" name="topicType">
+                                <option value="test">test</option>
+                                <option value="release">release</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="branchId" class="form-label">分支ID</label>
+                            <input type="number" class="form-control" id="branchId" name="branchId" value="123">
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="projectBranch" class="form-label">默认项目分支</label>
+                            <input type="text" class="form-control" id="projectBranch" name="projectBranch" 
+                                   value="upstream/master">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="archs" class="form-label">支持架构</label>
+                            <input type="text" class="form-control" id="archs" name="archs" 
+                                   value="amd64;arm64;loong64;sw64;mips64el">
+                            <div class="form-text">用分号分隔</div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <label class="form-label">默认打包架构</label>
+                            <div class="form-check-container">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="arch-amd64" value="amd64">
+                                    <label class="form-check-label" for="arch-amd64">amd64</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="arch-arm64" value="arm64">
+                                    <label class="form-check-label" for="arch-arm64">arm64</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="arch-loong64" value="loong64">
+                                    <label class="form-check-label" for="arch-loong64">loong64</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="arch-sw64" value="sw64">
+                                    <label class="form-check-label" for="arch-sw64">sw64</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="arch-mips64el" value="mips64el">
+                                    <label class="form-check-label" for="arch-mips64el">mips64el</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i> 保存CRP配置
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary ms-2" id="testCrpConnection">
+                                <i class="bi bi-cloud-check"></i> 测试连接
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Git配置 -->
+    <div class="tab-pane fade" id="git-config" role="tabpanel">
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0">Git标签管理配置</h5>
+            </div>
+            <div class="card-body">
+                <form id="gitConfigForm">
+                    <!-- 认证信息 -->
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <h6 class="text-primary">认证信息</h6>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="githubID" class="form-label">GitHub用户名 *</label>
+                            <input type="text" class="form-control" id="githubID" name="githubID" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="debEmail" class="form-label">维护者邮箱 *</label>
+                            <input type="email" class="form-control" id="debEmail" name="debEmail" required>
+                            <div class="form-text">格式：Name &lt;email@domain.com&gt;</div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-8">
+                            <label for="githubToken" class="form-label">GitHub Personal Access Token</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="githubToken" name="githubToken" 
+                                       placeholder="留空表示不使用token">
+                                <button class="btn btn-outline-secondary" type="button" id="toggleGithubToken">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                            <div class="form-text">
+                                <i class="bi bi-info-circle"></i> 
+                                设置token可提高API调用频率限制。需要repo权限。
+                                <a href="https://github.com/settings/tokens" target="_blank" class="text-decoration-none">
+                                    创建token <i class="bi bi-box-arrow-up-right"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="proxy" class="form-label">代理设置</label>
+                            <input type="text" class="form-control" id="proxy" name="proxy" 
+                                   placeholder="http://proxy.example.com:8080">
+                            <div class="form-text">GitHub访问代理（可选）</div>
+                        </div>
+                    </div>
+
+                    <!-- 参数配置 -->
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <h6 class="text-primary">参数配置</h6>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="projectOrg" class="form-label">默认组织</label>
+                            <input type="text" class="form-control" id="projectOrg" name="projectOrg" value="linuxdeepin">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="gitProjectBranch" class="form-label">默认分支</label>
+                            <input type="text" class="form-control" id="gitProjectBranch" name="projectBranch" value="master">
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="projectRootDir" class="form-label">工作目录</label>
+                            <input type="text" class="form-control" id="projectRootDir" name="projectRootDir" 
+                                   value="~/.cache/web-dev-tool-git">
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <label for="projectReviewers" class="form-label">默认审查人</label>
+                            <input type="text" class="form-control" id="projectReviewers" name="projectReviewers" 
+                                   placeholder="reviewer1,reviewer2">
+                            <div class="form-text">多个审查人用逗号分隔</div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <label for="watchRepos" class="form-label">关注仓库列表</label>
+                            <textarea class="form-control" id="watchRepos" name="watchRepos" rows="3"
+                                      placeholder="repo1&#10;repo2&#10;repo3"></textarea>
+                            <div class="form-text">每行一个仓库名</div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-success">
+                                <i class="bi bi-check-circle"></i> 保存Git配置
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary ms-2" id="testGitConnection">
+                                <i class="bi bi-cloud-check"></i> 测试连接
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadConfigs();
+    
+    // 密码显示/隐藏
+    document.getElementById('showPassword').addEventListener('click', function() {
+        const passwordInput = document.getElementById('crpPassword');
+        const icon = this.querySelector('i');
+        
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            icon.classList.remove('bi-eye');
+            icon.classList.add('bi-eye-slash');
+        } else {
+            passwordInput.type = 'password';
+            icon.classList.remove('bi-eye-slash');
+            icon.classList.add('bi-eye');
+        }
+    });
+    
+    // GitHub token显示/隐藏
+    document.getElementById('toggleGithubToken').addEventListener('click', function() {
+        const tokenInput = document.getElementById('githubToken');
+        const icon = this.querySelector('i');
+        
+        if (tokenInput.type === 'password') {
+            tokenInput.type = 'text';
+            icon.classList.remove('bi-eye');
+            icon.classList.add('bi-eye-slash');
+        } else {
+            tokenInput.type = 'password';
+            icon.classList.remove('bi-eye-slash');
+            icon.classList.add('bi-eye');
+        }
+    });
+    
+    // CRP配置表单提交
+    document.getElementById('crpConfigForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveCrpConfig();
+    });
+    
+    // Git配置表单提交
+    document.getElementById('gitConfigForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveGitConfig();
+    });
+    
+    // 测试连接
+    document.getElementById('testCrpConnection').addEventListener('click', testCrpConnection);
+    document.getElementById('testGitConnection').addEventListener('click', testGitConnection);
+});
+
+function loadConfigs() {
+    // 加载CRP配置
+    fetch('/api/config/crp')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('crpUserId').value = data.auth?.userId || '';
+            
+            // 处理密码字段
+            const passwordField = document.getElementById('crpPassword');
+            const password = data.auth?.password || '';
+            if (password === '***') {
+                // 如果后端返回占位符，显示占位符但不设置value
+                passwordField.placeholder = '已设置密码，留空保持不变';
+                passwordField.value = '';
+            } else if (password === '') {
+                // 如果后端返回空，显示需要设置密码的提示
+                passwordField.placeholder = '请输入CRP密码';
+                passwordField.value = '';
+            }
+            
+            document.getElementById('topicType').value = data.params?.topicType || 'test';
+            document.getElementById('branchId').value = data.params?.branchId || 123;
+            document.getElementById('projectBranch').value = data.params?.projectBranch || 'upstream/master';
+            document.getElementById('archs').value = data.params?.archs || 'amd64;arm64;loong64;sw64;mips64el';
+            
+            // 设置默认架构选择
+            const defaultArchs = data.params?.defaultArchs || ['amd64'];
+            defaultArchs.forEach(arch => {
+                const checkbox = document.getElementById(`arch-${arch}`);
+                if (checkbox) checkbox.checked = true;
+            });
+        })
+        .catch(error => console.error('Error loading CRP config:', error));
+    
+    // 加载Git配置
+    fetch('/api/config/git')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('githubID').value = data.auth?.githubID || '';
+            document.getElementById('debEmail').value = data.auth?.debEmail || '';
+            document.getElementById('proxy').value = data.auth?.proxy || '';
+            
+            // 处理GitHub token显示
+            const tokenField = document.getElementById('githubToken');
+            const token = data.auth?.githubToken || '';
+            if (token) {
+                tokenField.placeholder = '已设置Token，留空保持不变';
+                tokenField.value = '';
+            } else {
+                tokenField.placeholder = '留空表示不使用token';
+                tokenField.value = '';
+            }
+            
+            document.getElementById('projectOrg').value = data.params?.projectOrg || 'linuxdeepin';
+            document.getElementById('gitProjectBranch').value = data.params?.projectBranch || 'master';
+            document.getElementById('projectRootDir').value = data.params?.projectRootDir || '~/.cache/web-dev-tool-git';
+            
+            const reviewers = data.params?.projectReviewers || [];
+            document.getElementById('projectReviewers').value = reviewers.join(',');
+            
+            const watchRepos = data.params?.watchRepos || [];
+            document.getElementById('watchRepos').value = watchRepos.join('\n');
+        })
+        .catch(error => console.error('Error loading Git config:', error));
+}
+
+function saveCrpConfig() {
+    const formData = new FormData(document.getElementById('crpConfigForm'));
+    const password = document.getElementById('crpPassword').value;
+    
+    // 获取选中的默认架构
+    const defaultArchs = [];
+    document.querySelectorAll('input[id^="arch-"]:checked').forEach(checkbox => {
+        defaultArchs.push(checkbox.value);
+    });
+    
+    const config = {
+        auth: {
+            userId: formData.get('userId')
+        },
+        params: {
+            topicType: formData.get('topicType'),
+            branchId: parseInt(formData.get('branchId')),
+            projectBranch: formData.get('projectBranch'),
+            archs: formData.get('archs'),
+            defaultArchs: defaultArchs
+        }
+    };
+    
+    // 只有在用户输入了新密码时才包含密码字段
+    if (password.trim()) {
+        config.auth.password = password;
+    }
+    
+    const saveBtn = document.querySelector('#crpConfigForm button[type="submit"]');
+    const hideLoading = showLoading(saveBtn, '保存中...');
+    
+    fetch('/api/config/crp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            showAlert(data.message, 'success');
+            // 保存成功后重新加载配置，这样密码字段会正确显示状态
+            loadConfigs();
+        } else {
+            showAlert(data.message, 'danger');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        showAlert('保存失败: ' + error.message, 'danger');
+    });
+}
+
+function saveGitConfig() {
+    const formData = new FormData(document.getElementById('gitConfigForm'));
+    const githubToken = document.getElementById('githubToken').value;
+    
+    const reviewers = formData.get('projectReviewers').split(',').map(r => r.trim()).filter(r => r);
+    const watchRepos = document.getElementById('watchRepos').value.split('\n').map(r => r.trim()).filter(r => r);
+    
+    const config = {
+        auth: {
+            githubID: formData.get('githubID'),
+            debEmail: formData.get('debEmail'),
+            proxy: formData.get('proxy')
+        },
+        params: {
+            projectOrg: formData.get('projectOrg'),
+            projectBranch: formData.get('projectBranch'),
+            projectRootDir: formData.get('projectRootDir'),
+            projectReviewers: reviewers,
+            watchRepos: watchRepos
+        }
+    };
+    
+    // 只有在用户输入了token时才包含它
+    if (githubToken.trim()) {
+        config.auth.githubToken = githubToken.trim();
+    }
+    
+    const saveBtn = document.querySelector('#gitConfigForm button[type="submit"]');
+    const hideLoading = showLoading(saveBtn, '保存中...');
+    
+    fetch('/api/config/git', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            showAlert(data.message, 'success');
+        } else {
+            showAlert(data.message, 'danger');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        showAlert('保存失败: ' + error.message, 'danger');
+    });
+}
+
+function testCrpConnection() {
+    const testBtn = document.getElementById('testCrpConnection');
+    const hideLoading = showLoading(testBtn, '测试中...');
+    
+    fetch('/api/crp/login', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            hideLoading();
+            if (data.success) {
+                showAlert(`CRP连接成功！用户: ${data.user}`, 'success');
+            } else {
+                showAlert('CRP连接失败: ' + data.message, 'danger');
+            }
+        })
+        .catch(error => {
+            hideLoading();
+            showAlert('测试失败: ' + error.message, 'danger');
+        });
+}
+
+function testGitConnection() {
+    const testBtn = document.getElementById('testGitConnection');
+    const hideLoading = showLoading(testBtn, '测试中...');
+    
+    fetch('/api/git/repos?org=linuxdeepin')
+        .then(response => response.json())
+        .then(data => {
+            hideLoading();
+            if (data.success && data.repos.length > 0) {
+                showAlert(`GitHub连接成功！找到 ${data.repos.length} 个仓库`, 'success');
+            } else {
+                showAlert('GitHub连接失败，请检查网络和代理设置', 'warning');
+            }
+        })
+        .catch(error => {
+            hideLoading();
+            showAlert('测试失败: ' + error.message, 'danger');
+        });
+}
+</script>
+{% endblock %}

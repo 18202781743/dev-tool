@@ -1,0 +1,700 @@
+{% extends "base.html" %}
+
+{% block title %}CRP打包管理 - 开发工具套件{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2><i class="bi bi-box"></i> CRP打包管理</h2>
+        <p class="text-muted">管理CRP打包流程和主题</p>
+    </div>
+</div>
+
+<!-- 状态显示 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-1">CRP连接状态</h6>
+                        <div id="connectionStatus">
+                            <span class="badge bg-secondary">检查中...</span>
+                        </div>
+                        <small class="text-muted">系统会自动连接CRP，连接成功后可查看和管理主题</small>
+                    </div>
+                    <div>
+                        <button class="btn btn-outline-secondary btn-sm" id="refreshStatus">
+                            <i class="bi bi-arrow-clockwise"></i> 刷新状态
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 主题列表 -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-folder"></i> 主题列表
+                </h5>
+                <div class="d-flex">
+                    <input type="text" class="form-control form-control-sm me-2" id="topicFilter" 
+                           placeholder="搜索主题...">
+                    <button class="btn btn-outline-primary btn-sm" id="refreshTopics">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="topicsContainer">
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-cloud-slash" style="font-size: 2rem;"></i>
+                        <p class="mt-2">请先连接到CRP系统</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 新建打包模态框 -->
+<div class="modal fade" id="newPackageModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-plus-circle"></i> 新建打包任务
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="newPackageForm">
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="packageTopic" class="form-label">主题名称 *</label>
+                            <input type="text" class="form-control" id="packageTopic" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="packageProject" class="form-label">项目名称 *</label>
+                            <div class="position-relative">
+                                <input type="text" class="form-control" id="packageProject" required>
+                                <div id="projectSuggestions" class="position-absolute w-100 bg-white border rounded shadow-sm" 
+                                     style="top: 100%; z-index: 1000; display: none;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="packageBranch" class="form-label">分支</label>
+                            <input type="text" class="form-control" id="packageBranch" value="upstream/master">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">架构选择</label>
+                            <div class="form-check-container">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input arch-checkbox" type="checkbox" id="pkg-arch-amd64" value="amd64" checked>
+                                    <label class="form-check-label" for="pkg-arch-amd64">amd64</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input arch-checkbox" type="checkbox" id="pkg-arch-arm64" value="arm64" checked>
+                                    <label class="form-check-label" for="pkg-arch-arm64">arm64</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input arch-checkbox" type="checkbox" id="pkg-arch-loong64" value="loong64" checked>
+                                    <label class="form-check-label" for="pkg-arch-loong64">loong64</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="packageTag" class="form-label">自定义标签</label>
+                            <input type="text" class="form-control" id="packageTag" placeholder="留空则自动生成">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">最新提交信息</label>
+                            <div id="latestCommitInfo" class="form-control-plaintext text-muted">
+                                <small>选择项目后显示</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> 创建打包任务
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 批量打包模态框 -->
+<div class="modal fade" id="batchPackageModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-collection"></i> 批量打包任务
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="batchPackageForm">
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="batchTopic" class="form-label">主题名称 *</label>
+                            <input type="text" class="form-control" id="batchTopic" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">默认架构</label>
+                            <div class="form-check-container">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input batch-arch-checkbox" type="checkbox" 
+                                           id="batch-arch-amd64" value="amd64" checked>
+                                    <label class="form-check-label" for="batch-arch-amd64">amd64</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input batch-arch-checkbox" type="checkbox" 
+                                           id="batch-arch-arm64" value="arm64" checked>
+                                    <label class="form-check-label" for="batch-arch-arm64">arm64</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input batch-arch-checkbox" type="checkbox" 
+                                           id="batch-arch-loong64" value="loong64" checked>
+                                    <label class="form-check-label" for="batch-arch-loong64">loong64</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">项目列表</label>
+                        <div class="d-flex mb-2">
+                            <input type="text" class="form-control me-2" id="batchProjectInput" 
+                                   placeholder="输入项目名称...">
+                            <button type="button" class="btn btn-outline-primary" id="addBatchProject">
+                                <i class="bi bi-plus"></i> 添加
+                            </button>
+                        </div>
+                        <div id="batchProjectsList" class="border rounded p-3 min-height-100">
+                            <div class="text-muted text-center">暂无项目</div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <button type="button" class="btn btn-info btn-sm" id="checkBatchCommits">
+                            <i class="bi bi-search"></i> 批量检查最新提交
+                        </button>
+                    </div>
+                    
+                    <div id="batchCommitResults" class="mb-3" style="display: none;">
+                        <label class="form-label">提交信息预览</label>
+                        <div class="border rounded p-3 max-height-300 overflow-auto">
+                            <div id="batchCommitContent"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="bi bi-collection"></i> 批量创建打包任务
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 打包详情模态框 -->
+<div class="modal fade" id="packageDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-info-circle"></i> 打包详情
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="packageDetailContent">
+                    <div class="text-center">
+                        <div class="loading"></div>
+                        <p class="mt-2">加载中...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let isConnected = false;
+let currentTopic = null;
+let projectSuggestions = [];
+let batchProjects = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    // 检查连接状态
+    checkConnectionStatus();
+    
+    // 绑定事件
+    document.getElementById('refreshStatus').addEventListener('click', checkConnectionStatus);
+    document.getElementById('refreshTopics').addEventListener('click', loadTopics);
+    document.getElementById('topicFilter').addEventListener('input', debounce(filterTopics, 300));
+    document.getElementById('newPackageForm').addEventListener('submit', createPackage);
+    document.getElementById('batchPackageForm').addEventListener('submit', createBatchPackages);
+    document.getElementById('packageProject').addEventListener('input', debounce(searchProjects, 300));
+    document.getElementById('addBatchProject').addEventListener('click', addBatchProject);
+    document.getElementById('checkBatchCommits').addEventListener('click', checkBatchCommits);
+    
+    // 隐藏项目建议
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#packageProject') && !e.target.closest('#projectSuggestions')) {
+            document.getElementById('projectSuggestions').style.display = 'none';
+        }
+    });
+});
+
+function checkConnectionStatus() {
+    const statusElement = document.getElementById('connectionStatus');
+    const refreshBtn = document.getElementById('refreshStatus');
+    
+    const hideLoading = showLoading(refreshBtn, '检查中...');
+    
+    fetch('/api/crp/status')
+        .then(response => response.json())
+        .then(data => {
+            hideLoading();
+            if (data.success) {
+                isConnected = data.connected;
+                updateConnectionStatus(data.connected, data.user_name);
+                if (data.connected) {
+                    loadTopics();
+                }
+            } else {
+                showAlert('检查状态失败: ' + data.message, 'warning');
+            }
+        })
+        .catch(error => {
+            hideLoading();
+            showAlert('检查状态失败: ' + error.message, 'warning');
+            updateConnectionStatus(false);
+        });
+}
+
+function updateConnectionStatus(connected, user = '') {
+    const statusElement = document.getElementById('connectionStatus');
+    
+    if (connected) {
+        statusElement.innerHTML = `<span class="badge bg-success">已连接 - ${user || '未知用户'}</span>`;
+    } else {
+        statusElement.innerHTML = '<span class="badge bg-secondary">未连接</span>';
+    }
+}
+
+function loadTopics(filter = '') {
+    if (!isConnected) {
+        showAlert('请先连接到CRP系统', 'warning');
+        return;
+    }
+    
+    const container = document.getElementById('topicsContainer');
+    container.innerHTML = '<div class="text-center"><div class="loading"></div><p class="mt-2">加载主题列表...</p></div>';
+    
+    let url = '/api/crp/topics';
+    if (filter) {
+        url += `?filter=${encodeURIComponent(filter)}`;
+    }
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayTopics(data.topics);
+            } else {
+                container.innerHTML = `<div class="text-center text-danger"><i class="bi bi-exclamation-triangle"></i><p class="mt-2">${data.message}</p></div>`;
+            }
+        })
+        .catch(error => {
+            container.innerHTML = `<div class="text-center text-danger"><i class="bi bi-exclamation-triangle"></i><p class="mt-2">加载失败: ${error.message}</p></div>`;
+        });
+}
+
+function displayTopics(topics) {
+    const container = document.getElementById('topicsContainer');
+    
+    if (topics.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted"><i class="bi bi-folder2-open"></i><p class="mt-2">暂无主题</p></div>';
+        return;
+    }
+    
+    let html = '<div class="row">';
+    topics.forEach(topic => {
+        html += `
+            <div class="col-md-6 col-lg-4 mb-3 topic-item" data-topic-name="${topic.Name || ''}">
+                <div class="card topic-card h-100">
+                    <div class="card-body">
+                        <h6 class="card-title text-truncate" title="${topic.Name || '未知主题'}">
+                            <i class="bi bi-folder"></i> ${topic.Name || '未知主题'}
+                        </h6>
+                        <p class="card-text text-muted small">
+                            <span class="d-block">ID: ${topic.ID || 'N/A'}</span>
+                            <span class="d-block">创建者: ${topic.Creator || '未知'}</span>
+                            <span class="d-block">类型: ${topic.Type || '未知'}</span>
+                        </p>
+                        <div class="d-flex justify-content-center">
+                            <a href="/crp/topic/${encodeURIComponent(topic.Name || '')}" class="btn btn-primary btn-sm">
+                                <i class="bi bi-list"></i> 查看主题详情
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+    
+    container.innerHTML = html;
+}
+
+function filterTopics() {
+    if (!isConnected) {
+        showAlert('请先连接到CRP系统', 'warning');
+        return;
+    }
+    
+    const filter = document.getElementById('topicFilter').value.trim();
+    const container = document.getElementById('topicsContainer');
+    
+    // 如果搜索为空，重新加载所有主题
+    if (!filter) {
+        loadTopics();
+        return;
+    }
+    
+    // 显示加载状态
+    container.innerHTML = '<div class="text-center"><div class="loading"></div><p class="mt-2">搜索中...</p></div>';
+    
+    // 使用服务器端搜索
+    fetch(`/api/crp/topics?filter=${encodeURIComponent(filter)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayTopics(data.topics);
+            } else {
+                container.innerHTML = `<div class="text-center text-danger"><i class="bi bi-exclamation-triangle"></i><p class="mt-2">${data.message}</p></div>`;
+            }
+        })
+        .catch(error => {
+            container.innerHTML = `<div class="text-center text-danger"><i class="bi bi-exclamation-triangle"></i><p class="mt-2">搜索失败: ${error.message}</p></div>`;
+        });
+}
+
+// 主题相关函数已移动到专门的主题详情页面
+
+function searchProjects() {
+    const query = document.getElementById('packageProject').value;
+    if (query.length < 2) {
+        document.getElementById('projectSuggestions').style.display = 'none';
+        return;
+    }
+    
+    fetch(`/api/crp/projects?filter=${encodeURIComponent(query)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showProjectSuggestions(data.projects.slice(0, 10)); // 只显示前10个
+            }
+        })
+        .catch(error => {
+            console.error('Search projects failed:', error);
+        });
+}
+
+function showProjectSuggestions(projects) {
+    const container = document.getElementById('projectSuggestions');
+    
+    if (projects.length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+    
+    const html = projects.map(project => `
+        <div class="suggestion-item p-2 border-bottom cursor-pointer" onclick="selectProject('${project.Name}')">
+            <div class="fw-bold">${project.Name}</div>
+            <div class="text-muted small">${project.Description || '无描述'}</div>
+        </div>
+    `).join('');
+    
+    container.innerHTML = html;
+    container.style.display = 'block';
+}
+
+function selectProject(projectName) {
+    document.getElementById('packageProject').value = projectName;
+    document.getElementById('projectSuggestions').style.display = 'none';
+    
+    // 获取最新提交信息
+    getLatestCommit(projectName);
+}
+
+function getLatestCommit(projectName) {
+    const branch = document.getElementById('packageBranch').value || 'upstream/master';
+    const topic = document.getElementById('packageTopic').value;
+    
+    if (!topic) return;
+    
+    fetch(`/api/crp/branches?topic=${encodeURIComponent(topic)}&project=${encodeURIComponent(projectName)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.branches.length > 0) {
+                const branchInfo = data.branches.find(b => b.name === branch) || data.branches[0];
+                const commitInfo = `${branchInfo.commit || 'N/A'} - ${branchInfo.changelog || '无提交信息'}`;
+                document.getElementById('latestCommitInfo').innerHTML = `<small class="text-success">${commitInfo}</small>`;
+            } else {
+                document.getElementById('latestCommitInfo').innerHTML = '<small class="text-muted">无法获取提交信息</small>';
+            }
+        })
+        .catch(error => {
+            document.getElementById('latestCommitInfo').innerHTML = '<small class="text-danger">获取提交信息失败</small>';
+        });
+}
+
+function createPackage(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    const selectedArchs = Array.from(document.querySelectorAll('.arch-checkbox:checked')).map(cb => cb.value);
+    
+    const packageData = {
+        topic: document.getElementById('packageTopic').value,
+        project: document.getElementById('packageProject').value,
+        branch: document.getElementById('packageBranch').value,
+        archs: selectedArchs,
+        tag: document.getElementById('packageTag').value || null
+    };
+    
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const hideLoading = showLoading(submitBtn, '创建中...');
+    
+    fetch('/api/crp/package', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(packageData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            showAlert('打包任务创建成功！', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('newPackageModal')).hide();
+            e.target.reset();
+            loadTopics(); // 刷新主题列表
+        } else {
+            showAlert('创建失败: ' + data.message, 'danger');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        showAlert('创建失败: ' + error.message, 'danger');
+    });
+}
+
+function addBatchProject() {
+    const input = document.getElementById('batchProjectInput');
+    const projectName = input.value.trim();
+    
+    if (!projectName) {
+        showAlert('请输入项目名称', 'warning');
+        return;
+    }
+    
+    if (batchProjects.some(p => p.name === projectName)) {
+        showAlert('项目已存在', 'warning');
+        return;
+    }
+    
+    batchProjects.push({ name: projectName });
+    input.value = '';
+    updateBatchProjectsList();
+}
+
+function updateBatchProjectsList() {
+    const container = document.getElementById('batchProjectsList');
+    
+    if (batchProjects.length === 0) {
+        container.innerHTML = '<div class="text-muted text-center">暂无项目</div>';
+        return;
+    }
+    
+    const html = batchProjects.map((project, index) => `
+        <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+            <span>${project.name}</span>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeBatchProject(${index})">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>
+    `).join('');
+    
+    container.innerHTML = html;
+}
+
+function removeBatchProject(index) {
+    batchProjects.splice(index, 1);
+    updateBatchProjectsList();
+}
+
+function checkBatchCommits() {
+    if (batchProjects.length === 0) {
+        showAlert('请先添加项目', 'warning');
+        return;
+    }
+    
+    const topic = document.getElementById('batchTopic').value;
+    if (!topic) {
+        showAlert('请输入主题名称', 'warning');
+        return;
+    }
+    
+    const btn = document.getElementById('checkBatchCommits');
+    const hideLoading = showLoading(btn, '检查中...');
+    
+    // 这里应该并发检查所有项目的提交信息
+    // 为了简化，我们只显示一个模拟的结果
+    setTimeout(() => {
+        hideLoading();
+        
+        const resultsContainer = document.getElementById('batchCommitResults');
+        const contentContainer = document.getElementById('batchCommitContent');
+        
+        let html = batchProjects.map(project => `
+            <div class="mb-2">
+                <strong>${project.name}:</strong>
+                <span class="text-muted">最新提交信息加载中...</span>
+            </div>
+        `).join('');
+        
+        contentContainer.innerHTML = html;
+        resultsContainer.style.display = 'block';
+    }, 1000);
+}
+
+function createBatchPackages(e) {
+    e.preventDefault();
+    
+    if (batchProjects.length === 0) {
+        showAlert('请先添加项目', 'warning');
+        return;
+    }
+    
+    const selectedArchs = Array.from(document.querySelectorAll('.batch-arch-checkbox:checked')).map(cb => cb.value);
+    
+    const batchData = {
+        topic: document.getElementById('batchTopic').value,
+        packages: batchProjects.map(project => ({
+            name: project.name,
+            archs: selectedArchs
+        }))
+    };
+    
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const hideLoading = showLoading(submitBtn, '批量创建中...');
+    
+    fetch('/api/crp/batch-package', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(batchData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            showAlert(`批量打包任务创建完成！共 ${batchProjects.length} 个项目`, 'success');
+            bootstrap.Modal.getInstance(document.getElementById('batchPackageModal')).hide();
+            e.target.reset();
+            batchProjects = [];
+            updateBatchProjectsList();
+            loadTopics(); // 刷新主题列表
+        } else {
+            showAlert('批量创建失败: ' + data.message, 'danger');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        showAlert('批量创建失败: ' + error.message, 'danger');
+    });
+}
+
+function viewPackageDetail(instanceId) {
+    const modal = new bootstrap.Modal(document.getElementById('packageDetailModal'));
+    const content = document.getElementById('packageDetailContent');
+    
+    content.innerHTML = '<div class="text-center"><div class="loading"></div><p class="mt-2">加载详情...</p></div>';
+    modal.show();
+    
+    // 这里应该获取打包实例的详细信息
+    // 为了简化，显示一个模拟的详情
+    setTimeout(() => {
+        content.innerHTML = `
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>基本信息</h6>
+                    <table class="table table-sm">
+                        <tr><td>实例ID:</td><td>${instanceId}</td></tr>
+                        <tr><td>项目名称:</td><td>示例项目</td></tr>
+                        <tr><td>版本:</td><td>1.0.0</td></tr>
+                        <tr><td>状态:</td><td>${formatBuildStatus('SUCCESS')}</td></tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <h6>构建信息</h6>
+                    <table class="table table-sm">
+                        <tr><td>架构:</td><td>amd64, arm64</td></tr>
+                        <tr><td>分支:</td><td>upstream/master</td></tr>
+                        <tr><td>提交:</td><td>abc123...</td></tr>
+                        <tr><td>构建时间:</td><td>${new Date().toLocaleString()}</td></tr>
+                    </table>
+                </div>
+            </div>
+            <div class="mt-3">
+                <h6>变更日志</h6>
+                <pre class="bg-light p-2 rounded">
+* 修复了一些bug
+* 添加了新功能
+* 更新了依赖
+                </pre>
+            </div>
+        `;
+    }, 1000);
+}
+</script>
+
+<style>
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.suggestion-item:hover {
+    background-color: #f8f9fa;
+}
+
+.min-height-100 {
+    min-height: 100px;
+}
+
+.max-height-300 {
+    max-height: 300px;
+}
+</style>
+{% endblock %}
