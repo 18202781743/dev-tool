@@ -175,12 +175,83 @@ class GitManager:
             self.logger.error(f"Get repo tags failed: {str(e)}")
             return []
     
+    def get_latest_tag_from_commits(self, org: str, repo: str) -> Dict[str, Any]:
+        """
+        获取最新标签信息（基于提交历史，类似git describe --tags --abbrev=0的逻辑）
+        返回标签信息和对应的提交SHA
+        """
+        try:
+            # 获取提交历史
+            commits = self.get_repo_commits(org, repo)
+            if not commits:
+                return {'tag': '0.0.0', 'commit_sha': '', 'found': False}
+            
+            # 获取所有标签
+            tags = self.get_repo_tags(org, repo)
+            if not tags:
+                return {'tag': '0.0.0', 'commit_sha': '', 'found': False}
+            
+            # 遍历提交历史，找到第一个有标签的提交
+            for commit in commits:
+                commit_sha = commit.get('sha', '')
+                # 检查这个提交是否有标签
+                for tag in tags:
+                    tag_commit_sha = tag.get('commit', {}).get('sha', '')
+                    if commit_sha == tag_commit_sha:
+                        tag_name = tag.get('name', '')
+                        self.logger.debug(f"Found tag {tag_name} at commit {commit_sha[:8]}")
+                        return {
+                            'tag': tag_name,
+                            'commit_sha': tag_commit_sha,
+                            'found': True,
+                            'tag_info': tag
+                        }
+            
+            # 如果没有找到匹配的提交，使用最新的版本号格式的标签
+            version_pattern = r'^\d+\.\d+\.\d+$'
+            version_tags = []
+            
+            for tag in tags:
+                tag_name = tag.get('name', '')
+                if re.match(version_pattern, tag_name):
+                    version_tags.append(tag)
+            
+            if version_tags:
+                # 按版本号排序，获取最新版本
+                def version_key(tag):
+                    tag_name = tag.get('name', '0.0.0')
+                    try:
+                        parts = tag_name.split('.')
+                        return (int(parts[0]), int(parts[1]), int(parts[2]))
+                    except (ValueError, IndexError):
+                        return (0, 0, 0)
+                
+                version_tags.sort(key=version_key, reverse=True)
+                latest_version_tag = version_tags[0]
+                return {
+                    'tag': latest_version_tag.get('name', '0.0.0'),
+                    'commit_sha': latest_version_tag.get('commit', {}).get('sha', ''),
+                    'found': True,
+                    'tag_info': latest_version_tag
+                }
+            
+            # 最后退化到第一个标签
+            first_tag = tags[0]
+            return {
+                'tag': first_tag.get('name', '0.0.0'),
+                'commit_sha': first_tag.get('commit', {}).get('sha', ''),
+                'found': True,
+                'tag_info': first_tag
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Get latest tag from commits failed: {str(e)}")
+            return {'tag': '0.0.0', 'commit_sha': '', 'found': False}
+    
     def get_latest_tag(self, org: str, repo: str) -> str:
-        """获取最新标签"""
-        tags = self.get_repo_tags(org, repo)
-        if not tags:
-            return "0.0.0"
-        return tags[0].get('name', '0.0.0')
+        """获取最新标签（保持向后兼容）"""
+        result = self.get_latest_tag_from_commits(org, repo)
+        return result.get('tag', '0.0.0')
     
     def generate_next_tag(self, current_tag: str) -> str:
         """生成下一个标签版本号"""
@@ -341,23 +412,50 @@ Signed-off-by: {deb_email}"""
             
             repos_status = []
             for repo_name in watch_repos:
+                self.logger.info(f"Processing repo: {org}/{repo_name}")
+                
                 # 获取最新提交
                 commits = self.get_repo_commits(org, repo_name)
                 latest_commit = commits[0] if commits else {}
                 
-                # 获取最新标签
-                latest_tag = self.get_latest_tag(org, repo_name)
+                # 获取标签信息（使用基于提交历史的智能算法）
+                tag_info = self.get_latest_tag_from_commits(org, repo_name)
+                latest_tag = tag_info.get('tag', '')
+                tag_commit_sha = tag_info.get('commit_sha', '')
+                
+                if tag_info.get('found', False):
+                    self.logger.debug(f"Latest tag for {repo_name}: {latest_tag} (commit: {tag_commit_sha[:8] if tag_commit_sha else 'N/A'})")
+                else:
+                    self.logger.debug(f"No tags found for {repo_name}, using default")
+                
+                # 计算自上次标签以来的提交数量
+                commits_since_tag = 0
+                commits_since_tag_list = []
+                
+                if tag_commit_sha and commits:
+                    for commit in commits:
+                        if commit.get('sha') == tag_commit_sha:
+                            break
+                        commits_since_tag += 1
+                        commits_since_tag_list.append(commit)
+                elif not tags and commits:
+                    # 如果没有标签，显示所有提交
+                    commits_since_tag = len(commits)
+                    commits_since_tag_list = commits
                 
                 # 预测下一个标签
-                next_tag = self.generate_next_tag(latest_tag)
+                next_tag = self.generate_next_tag(latest_tag or "0.0.0")
                 
                 repo_status = {
                     'name': repo_name,
                     'org': org,
                     'latest_commit': latest_commit,
-                    'latest_tag': latest_tag,
+                    'latest_tag': latest_tag or "无标签",
                     'next_tag': next_tag,
-                    'last_updated': latest_commit.get('commit', {}).get('author', {}).get('date', '')
+                    'commits_since_tag': commits_since_tag,
+                    'commits_since_tag_list': commits_since_tag_list[:10],  # 只保留前10个提交用于显示
+                    'last_updated': latest_commit.get('commit', {}).get('author', {}).get('date', ''),
+                    'tag_commit_sha': tag_commit_sha
                 }
                 repos_status.append(repo_status)
             
@@ -367,6 +465,86 @@ Signed-off-by: {deb_email}"""
             
         except Exception as e:
             self.logger.error(f"Get watch repos status failed: {str(e)}")
+            return []
+    
+    def get_commits_since_tag(self, org: str, repo: str, tag_sha: str) -> List[Dict[str, Any]]:
+        """获取自指定标签以来的提交列表"""
+        try:
+            # 使用GitHub API的比较功能
+            url = f"{self.github_api_base}/repos/{org}/{repo}/compare/{tag_sha}...HEAD"
+            
+            # 设置代理
+            git_config = config_manager.get_git_config()
+            proxy = git_config.get('auth', {}).get('proxy', '')
+            proxies = None
+            if proxy:
+                proxies = {
+                    'http': proxy,
+                    'https': proxy
+                }
+            
+            response = requests.get(
+                url,
+                headers=self._get_github_headers(),
+                proxies=proxies,
+                timeout=30
+            )
+            response.raise_for_status()
+            
+            comparison = response.json()
+            return comparison.get('commits', [])
+            
+        except Exception as e:
+            self.logger.error(f"Get commits since tag failed: {str(e)}")
+            return []
+    
+    def get_commits_since_tag_detailed(self, org: str, repo: str, tag: str) -> List[Dict[str, Any]]:
+        """获取自指定标签以来的详细提交信息"""
+        try:
+            # 首先获取标签信息
+            tags = self.get_repo_tags(org, repo)
+            tag_commit_sha = None
+            
+            for tag_info in tags:
+                if tag_info.get('name') == tag:
+                    tag_commit_sha = tag_info.get('commit', {}).get('sha')
+                    break
+            
+            if not tag_commit_sha:
+                self.logger.error(f"Tag {tag} not found in {org}/{repo}")
+                return []
+            
+            # 使用GitHub API的比较功能获取详细提交信息
+            url = f"{self.github_api_base}/repos/{org}/{repo}/compare/{tag_commit_sha}...HEAD"
+            
+            # 设置代理
+            git_config = config_manager.get_git_config()
+            proxy = git_config.get('auth', {}).get('proxy', '')
+            proxies = None
+            if proxy:
+                proxies = {
+                    'http': proxy,
+                    'https': proxy
+                }
+            
+            response = requests.get(
+                url,
+                headers=self._get_github_headers(),
+                proxies=proxies,
+                timeout=30
+            )
+            response.raise_for_status()
+            
+            comparison = response.json()
+            commits = comparison.get('commits', [])
+            
+            # 按时间倒序排序
+            commits.sort(key=lambda x: x.get('commit', {}).get('author', {}).get('date', ''), reverse=True)
+            
+            return commits
+            
+        except Exception as e:
+            self.logger.error(f"Get detailed commits since tag failed: {str(e)}")
             return []
 
 # 全局Git管理器实例

@@ -329,6 +329,28 @@ def api_git_latest_tag():
     except Exception as e:
         return jsonify({'success': False, 'message': f'获取标签信息失败: {str(e)}'})
 
+@app.route('/api/git/commits-detail')
+def api_git_commits_detail():
+    """获取提交详情"""
+    try:
+        org = request.args.get('org')
+        repo = request.args.get('repo')
+        since_tag = request.args.get('since_tag')
+        
+        if not org or not repo:
+            return jsonify({'success': False, 'message': '参数缺失'})
+        
+        if since_tag:
+            # 获取自指定标签以来的提交
+            commits = git_manager.get_commits_since_tag_detailed(org, repo, since_tag)
+        else:
+            # 获取最近的提交
+            commits = git_manager.get_repo_commits(org, repo)[:20]  # 限制20个提交
+        
+        return jsonify({'success': True, 'commits': commits})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'获取提交详情失败: {str(e)}'})
+
 @app.route('/api/git/create-tag', methods=['POST'])
 def api_git_create_tag():
     """创建标签PR"""

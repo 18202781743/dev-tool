@@ -72,14 +72,36 @@
     <!-- 关注仓库 -->
     <div class="tab-pane fade show active" id="watch-repos" role="tabpanel">
         <div class="card mt-3">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">
-                    <i class="bi bi-star"></i> 关注仓库状态
-                </h5>
-                <div>
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">
+                        <i class="bi bi-star"></i> 关注仓库状态
+                    </h5>
                     <button class="btn btn-outline-primary btn-sm" id="loadWatchRepos">
                         <i class="bi bi-arrow-clockwise"></i> 刷新状态
                     </button>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">
+                                <i class="bi bi-search"></i>
+                            </span>
+                            <input type="text" class="form-control" id="repoTableFilter" 
+                                   placeholder="搜索仓库名称...">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select form-select-sm" id="tagStatusFilter">
+                            <option value="">所有状态</option>
+                            <option value="no-tag">无标签</option>
+                            <option value="up-to-date">已是最新</option>
+                            <option value="needs-update">需要更新</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 text-end">
+                        <span class="badge bg-light text-dark" id="repoCount">0 个仓库</span>
+                    </div>
                 </div>
             </div>
             <div class="card-body">
@@ -242,11 +264,40 @@
         </div>
     </div>
 </div>
+
+<!-- 提交详情模态框 -->
+<div class="modal fade" id="commitsDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-git"></i> <span id="commitsModalTitle">提交详情</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="commitsDetailContent">
+                    <div class="text-center">
+                        <div class="loading"></div>
+                        <p class="mt-2">加载提交列表...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                <a id="viewOnGithubBtn" href="#" target="_blank" class="btn btn-primary">
+                    <i class="bi bi-box-arrow-up-right"></i> 在GitHub上查看
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
 let watchedRepos = [];
+let allWatchedRepos = []; // 存储所有仓库数据用于筛选
 let trackedPRs = JSON.parse(localStorage.getItem('trackedPRs') || '[]');
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -259,6 +310,10 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('generateTag').addEventListener('click', generateTag);
     document.getElementById('tagRepo').addEventListener('input', debounce(searchTagRepos, 300));
     document.getElementById('tagRepo').addEventListener('change', loadRepoInfo);
+    
+    // 绑定筛选事件
+    document.getElementById('repoTableFilter').addEventListener('input', debounce(filterRepoTable, 300));
+    document.getElementById('tagStatusFilter').addEventListener('change', filterRepoTable);
     
     // 加载初始数据
     loadWatchRepos();
@@ -310,7 +365,9 @@ function loadWatchRepos() {
         .then(data => {
             if (data.success) {
                 watchedRepos = data.repos;
+                allWatchedRepos = data.repos; // 存储原始数据
                 displayWatchRepos(data.repos);
+                updateRepoCount(data.repos.length);
             } else {
                 container.innerHTML = `<div class="text-center text-danger"><i class="bi bi-exclamation-triangle"></i><p class="mt-2">${data.message}</p></div>`;
             }
@@ -334,46 +391,282 @@ function displayWatchRepos(repos) {
         return;
     }
     
-    let html = '<div class="row">';
+    // 按更新时间倒序排序
+    repos.sort((a, b) => {
+        const dateA = new Date(a.last_updated || 0);
+        const dateB = new Date(b.last_updated || 0);
+        return dateB - dateA;
+    });
+    
+    let html = `
+        <div class="repo-table-container">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>仓库名称</th>
+                        <th>上一个标签</th>
+                        <th>预期标签</th>
+                        <th>新增提交</th>
+                        <th>更新时间</th>
+                        <th>最新提交</th>
+                        <th width="200">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
     repos.forEach(repo => {
-        const commitDate = repo.last_updated ? new Date(repo.last_updated).toLocaleDateString() : '未知';
+        const commitDate = repo.last_updated ? formatDateTime(repo.last_updated) : '未知';
         const commitMsg = repo.latest_commit?.commit?.message?.split('\\n')[0] || '无提交信息';
+        const commitHash = repo.latest_commit?.sha?.substring(0, 7) || '';
+        
+        // 生成状态徽章
+        const tagStatus = getTagStatus(repo.latest_tag, repo.next_tag);
+        
+        const commitsSinceTag = repo.commits_since_tag || 0;
+        const commitsButtonClass = commitsSinceTag > 0 ? 'btn-outline-warning' : 'btn-outline-secondary';
+        const commitsButtonText = commitsSinceTag > 0 ? `${commitsSinceTag} 个新提交` : '无新提交';
         
         html += `
-            <div class="col-md-6 col-lg-4 mb-3">
-                <div class="card repo-card h-100">
-                    <div class="card-body">
-                        <h6 class="card-title text-truncate" title="${repo.name}">
-                            <i class="bi bi-folder"></i> ${repo.name}
-                        </h6>
-                        <p class="card-text text-muted small">
-                            <span class="d-block">组织: ${repo.org}</span>
-                            <span class="d-block">最新标签: ${repo.latest_tag}</span>
-                            <span class="d-block">预计标签: ${repo.next_tag}</span>
-                            <span class="d-block">更新时间: ${commitDate}</span>
-                        </p>
-                        <div class="mb-2">
-                            <small class="text-muted text-truncate d-block" title="${commitMsg}">
-                                ${commitMsg}
-                            </small>
+            <tr>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-folder me-2 text-primary"></i>
+                        <div>
+                            <div class="fw-semibold">${repo.name}</div>
+                            <small class="text-muted">${repo.org}</small>
                         </div>
-                        <div class="d-flex justify-content-between">
-                            <button class="btn btn-primary btn-sm" onclick="createTagForRepo('${repo.org}', '${repo.name}')">
-                                <i class="bi bi-tag"></i> 创建标签
-                            </button>
-                            <a href="https://github.com/${repo.org}/${repo.name}" target="_blank" 
-                               class="btn btn-outline-secondary btn-sm">
-                                <i class="bi bi-box-arrow-up-right"></i>
-                            </a>
+                    </div>
+                </td>
+                <td>
+                    <span class="badge bg-secondary">${repo.latest_tag || '无标签'}</span>
+                </td>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <span class="badge ${tagStatus.class} me-1">${repo.next_tag || '未计算'}</span>
+                        ${tagStatus.icon}
+                    </div>
+                </td>
+                <td>
+                    <button class="btn ${commitsButtonClass} btn-sm" 
+                            onclick="showCommitsSinceTag('${repo.org}', '${repo.name}', '${repo.latest_tag || ''}', ${commitsSinceTag})"
+                            ${commitsSinceTag === 0 ? 'disabled' : ''}>
+                        <i class="bi bi-git"></i> ${commitsButtonText}
+                    </button>
+                </td>
+                <td>
+                    <div>
+                        <div class="small">${commitDate}</div>
+                        <small class="text-muted">${getRelativeTime(repo.last_updated)}</small>
+                    </div>
+                </td>
+                <td>
+                    <div class="commit-info" style="max-width: 300px;">
+                        <div class="text-truncate" title="${commitMsg}">
+                            ${commitMsg}
+                        </div>
+                        ${commitHash ? `<small class="text-muted font-monospace">${commitHash}</small>` : ''}
+                    </div>
+                </td>
+                <td>
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-primary btn-sm" onclick="createTagForRepo('${repo.org}', '${repo.name}')" 
+                                title="创建新标签">
+                            <i class="bi bi-tag"></i> 标签
+                        </button>
+                        <a href="https://github.com/${repo.org}/${repo.name}" target="_blank" 
+                           class="btn btn-outline-secondary btn-sm" title="打开GitHub">
+                            <i class="bi bi-box-arrow-up-right"></i>
+                        </a>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += `
+                </tbody>
+            </table>
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+function getTagStatus(currentTag, nextTag) {
+    if (!currentTag) {
+        return { class: 'bg-warning text-dark', icon: '<i class="bi bi-exclamation-triangle text-warning"></i>' };
+    }
+    if (!nextTag) {
+        return { class: 'bg-secondary', icon: '' };
+    }
+    
+    // 比较版本号，简单的字符串比较
+    if (currentTag === nextTag) {
+        return { class: 'bg-success', icon: '<i class="bi bi-check-circle text-success"></i>' };
+    } else {
+        return { class: 'bg-info', icon: '<i class="bi bi-arrow-up text-info"></i>' };
+    }
+}
+
+function formatDateTime(dateString) {
+    if (!dateString) return '未知';
+    const date = new Date(dateString);
+    return date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+function getRelativeTime(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = now - date;
+    
+    const minutes = Math.floor(diff / (1000 * 60));
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    
+    if (minutes < 1) return '刚刚';
+    if (minutes < 60) return `${minutes}分钟前`;
+    if (hours < 24) return `${hours}小时前`;
+    if (days < 30) return `${days}天前`;
+    return '很久以前';
+}
+
+function filterRepoTable() {
+    const nameFilter = document.getElementById('repoTableFilter').value.toLowerCase();
+    const statusFilter = document.getElementById('tagStatusFilter').value;
+    
+    let filteredRepos = allWatchedRepos.filter(repo => {
+        // 名称筛选
+        const nameMatch = repo.name.toLowerCase().includes(nameFilter);
+        
+        // 状态筛选
+        let statusMatch = true;
+        if (statusFilter) {
+            switch (statusFilter) {
+                case 'no-tag':
+                    statusMatch = !repo.latest_tag;
+                    break;
+                case 'up-to-date':
+                    statusMatch = repo.latest_tag === repo.next_tag;
+                    break;
+                case 'needs-update':
+                    statusMatch = repo.latest_tag && repo.next_tag && repo.latest_tag !== repo.next_tag;
+                    break;
+            }
+        }
+        
+        return nameMatch && statusMatch;
+    });
+    
+    displayWatchRepos(filteredRepos);
+    updateRepoCount(filteredRepos.length);
+}
+
+function updateRepoCount(count) {
+    const countElement = document.getElementById('repoCount');
+    if (countElement) {
+        countElement.textContent = `${count} 个仓库`;
+    }
+}
+
+function showCommitsSinceTag(org, repo, tag, commitCount) {
+    if (commitCount === 0) return;
+    
+    const modal = new bootstrap.Modal(document.getElementById('commitsDetailModal'));
+    const modalTitle = document.getElementById('commitsModalTitle');
+    const modalContent = document.getElementById('commitsDetailContent');
+    const githubBtn = document.getElementById('viewOnGithubBtn');
+    
+    modalTitle.textContent = `${repo} - 自 ${tag || '首次提交'} 以来的 ${commitCount} 个提交`;
+    modalContent.innerHTML = '<div class="text-center"><div class="loading"></div><p class="mt-2">加载提交列表...</p></div>';
+    
+    // 设置GitHub链接
+    if (tag) {
+        githubBtn.href = `https://github.com/${org}/${repo}/compare/${tag}...HEAD`;
+    } else {
+        githubBtn.href = `https://github.com/${org}/${repo}/commits`;
+    }
+    
+    modal.show();
+    
+    // 获取提交详情
+    let url = `/api/git/commits-detail?org=${encodeURIComponent(org)}&repo=${encodeURIComponent(repo)}`;
+    if (tag) {
+        url += `&since_tag=${encodeURIComponent(tag)}`;
+    }
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayCommitsDetail(data.commits);
+            } else {
+                modalContent.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> ${data.message}</div>`;
+            }
+        })
+        .catch(error => {
+            modalContent.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> 加载失败: ${error.message}</div>`;
+        });
+}
+
+function displayCommitsDetail(commits) {
+    const modalContent = document.getElementById('commitsDetailContent');
+    
+    if (!commits || commits.length === 0) {
+        modalContent.innerHTML = '<div class="text-center text-muted"><i class="bi bi-info-circle"></i><p class="mt-2">没有找到提交记录</p></div>';
+        return;
+    }
+    
+    let html = '<div class="commits-list">';
+    
+    commits.forEach(commit => {
+        const commitMsg = commit.commit?.message || '无提交信息';
+        const commitLines = commitMsg.split('\n');
+        const commitTitle = commitLines[0];
+        const commitBody = commitLines.slice(1).join('\n').trim();
+        
+        const author = commit.commit?.author?.name || '未知作者';
+        const date = commit.commit?.author?.date || '';
+        const sha = commit.sha?.substring(0, 7) || '';
+        const avatarUrl = commit.author?.avatar_url || '';
+        
+        html += `
+            <div class="commit-item border-bottom pb-3 mb-3">
+                <div class="d-flex">
+                    <div class="flex-shrink-0 me-3">
+                        ${avatarUrl ? `<img src="${avatarUrl}" class="rounded-circle" width="32" height="32" alt="${author}">` : `<div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;"><i class="bi bi-person text-white"></i></div>`}
+                    </div>
+                    <div class="flex-grow-1">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold commit-title">${commitTitle}</div>
+                                ${commitBody ? `<div class="text-muted small mt-1 commit-body" style="white-space: pre-wrap;">${commitBody}</div>` : ''}
+                                <div class="text-muted small mt-2">
+                                    <i class="bi bi-person"></i> ${author} 
+                                    <i class="bi bi-clock ms-2"></i> ${formatDateTime(date)}
+                                </div>
+                            </div>
+                            <div class="flex-shrink-0 ms-3">
+                                <code class="small">${sha}</code>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         `;
     });
-    html += '</div>';
     
-    container.innerHTML = html;
+    html += '</div>';
+    modalContent.innerHTML = html;
 }
 
 function searchRepos() {
@@ -759,6 +1052,19 @@ function removePRTracking(prId) {
         showAlert('PR跟踪已移除', 'success');
     }
 }
+
+// 工具函数
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
 </script>
 
 <style>
@@ -768,6 +1074,104 @@ function removePRTracking(prId) {
 
 .suggestion-item:hover {
     background-color: #f8f9fa;
+}
+
+/* 表格样式优化 */
+.table th {
+    border-top: none;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: #495057;
+    background-color: #f8f9fa;
+    position: sticky;
+    top: 0;
+}
+
+.table td {
+    vertical-align: middle;
+    border-color: #e9ecef;
+}
+
+.table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.commit-info {
+    font-size: 0.875rem;
+}
+
+.repo-table-container {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .btn-group .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+    
+    .commit-info {
+        max-width: 200px !important;
+    }
+}
+
+/* 加载动画 */
+.loading {
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #007bff;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    animation: spin 1s linear infinite;
+    display: inline-block;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 提交详情样式 */
+.commits-list {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.commit-item {
+    transition: background-color 0.2s ease;
+}
+
+.commit-item:hover {
+    background-color: #f8f9fa;
+    border-radius: 0.375rem;
+    margin: -0.5rem;
+    padding: 0.5rem !important;
+}
+
+.commit-title {
+    font-size: 0.95rem;
+    line-height: 1.4;
+}
+
+.commit-body {
+    font-size: 0.85rem;
+    max-height: 100px;
+    overflow-y: auto;
+    background-color: #f8f9fa;
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    border-left: 3px solid #dee2e6;
+}
+
+/* 新增提交按钮样式 */
+.btn-outline-warning {
+    --bs-btn-color: #f57c00;
+    --bs-btn-border-color: #f57c00;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #f57c00;
+    --bs-btn-hover-border-color: #f57c00;
 }
 </style>
 {% endblock %}
