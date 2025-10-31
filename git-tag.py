@@ -157,98 +157,10 @@ def initRepo():
 def findCommitByChangelogBlame(changelog_version):
     """使用 git blame 和时间信息来查找 changelog 版本对应的提交"""
     try:
-        # 获取 changelog 版本的详细信息，包括时间
-        changelog_info = subprocess.run(
-            ["dpkg-parsechangelog", "--format", "rfc822"],
-            capture_output=True,
-            text=True
-        )
-        
-        if changelog_info.returncode != 0:
-            logger.warning("Could not get detailed changelog info")
-            return None
-            
-        # 解析 changelog 信息，获取时间戳
-        changelog_lines = changelog_info.stdout.split('\n')
-        changelog_date = None
-        for line in changelog_lines:
-            if line.startswith('Date:'):
-                changelog_date = line.split('Date:', 1)[1].strip()
-                break
-        
-        if not changelog_date:
-            logger.warning("Could not find date in changelog")
-            return None
-            
-        logger.info(f"Found changelog date for {changelog_version}: {changelog_date}")
-        
-        # 解析 changelog 日期为时间戳 (将 RFC2822 格式转换为时间戳)
-        import email.utils
-        try:
-            changelog_timestamp = email.utils.parsedate_to_datetime(changelog_date).timestamp()
-            logger.info(f"Parsed changelog timestamp: {changelog_timestamp}")
-        except Exception as e:
-            logger.warning(f"Could not parse changelog date '{changelog_date}': {e}")
-            # 如果时间解析失败，回退到字符串匹配
-            return _fallbackStringMatch(changelog_version)
-        
-        # 使用 git blame 查找 debian/changelog 文件中包含版本号的行
-        blame_result = subprocess.run(
-            ["git", "blame", "--porcelain", "debian/changelog"],
-            capture_output=True,
-            text=True
-        )
-        
-        if blame_result.returncode != 0:
-            logger.warning("Could not run git blame on debian/changelog")
-            return None
-            
-        # 解析 blame 输出，查找与时间戳最接近的包含版本号的行
-        lines = blame_result.stdout.split('\n')
-        current_commit = None
-        current_author_time = None
-        best_match_commit = None
-        best_time_diff = float('inf')
-        
-        for i, line in enumerate(lines):
-            # porcelain 格式解析
-            if line and not line.startswith('\t'):
-                if ' ' in line:
-                    parts = line.split(' ')
-                    if len(parts) >= 1 and len(parts[0]) == 40 and all(c in '0123456789abcdef' for c in parts[0].lower()):
-                        # 这是一个 commit hash 行
-                        current_commit = parts[0]
-                        current_author_time = None
-                elif line.startswith('author-time ') and current_commit:
-                    # 获取作者时间
-                    try:
-                        current_author_time = int(line.split('author-time ')[1])
-                    except (IndexError, ValueError):
-                        current_author_time = None
-            elif line.startswith('\t') and current_commit and current_author_time:
-                # 这是实际的内容行
-                content = line[1:]  # 去掉开头的 tab
-                # 检查是否包含版本号（在 debian/changelog 格式中）
-                if f"({changelog_version})" in content and ('unstable' in content or 'stable' in content):
-                    # 计算时间差
-                    time_diff = abs(current_author_time - changelog_timestamp)
-                    logger.debug(f"Found potential match: commit {current_commit}, time diff: {time_diff}s")
-                    logger.debug(f"Content: {content.strip()}")
-                    
-                    # 如果时间差更小，更新最佳匹配
-                    if time_diff < best_time_diff:
-                        best_time_diff = time_diff
-                        best_match_commit = current_commit
-                        logger.debug(f"New best match: {current_commit} (time diff: {time_diff}s)")
-        
-        if best_match_commit:
-            logger.info(f"Found best time-matched commit for changelog version {changelog_version}: {best_match_commit}")
-            logger.info(f"Time difference: {best_time_diff}s")
-            return best_match_commit
-        else:
-            logger.warning(f"Could not find time-matched commit for changelog version {changelog_version}")
-            # 回退到字符串匹配
-            return _fallbackStringMatch(changelog_version)
+        # 直接使用字符串匹配方法，因为时间戳方法在这里不适用
+        # dpkg-parsechangelog 只能获取当前最新版本的时间戳，而不是历史版本的
+        logger.info(f"Finding commit for changelog version {changelog_version} using string matching")
+        return _fallbackStringMatch(changelog_version)
         
     except Exception as e:
         logger.error(f"Error in findCommitByChangelogBlame: {str(e)}")
@@ -718,6 +630,189 @@ def runRelease():
         logger.error(f"Unexpected error in runRelease: {str(e)}")
         raise SystemExit(1)
 
+def localCommitTag(repo_path):
+    """在本地仓库中更新changelog并提交tag"""
+    try:
+        # 验证仓库路径
+        if not repo_path:
+            logger.error("Repository path is required for localcommit command")
+            logger.error("Please use --repo-path to specify the local repository path")
+            raise SystemExit(1)
+            
+        repo_path = os.path.expanduser(repo_path)
+        if not os.path.exists(repo_path):
+            logger.error(f"Repository path does not exist: {repo_path}")
+            raise SystemExit(1)
+            
+        if not os.path.exists(os.path.join(repo_path, '.git')):
+            logger.error(f"Not a git repository: {repo_path}")
+            raise SystemExit(1)
+            
+        # 切换到仓库目录
+        original_cwd = os.getcwd()
+        os.chdir(repo_path)
+        logger.info(f"Working in repository: {repo_path}")
+        
+        try:
+            # 检查仓库状态
+            status_result = subprocess.run(
+                ["git", "status", "--porcelain"],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            
+            if status_result.stdout.strip():
+                logger.warning("Repository has uncommitted changes:")
+                logger.warning(status_result.stdout.strip())
+                logger.info("Continuing with changelog update...")
+            
+            # 设置DEBEMAIL环境变量
+            os.environ["DEBEMAIL"] = argsInfo.debEmail
+            
+            # 获取最新的标签版本作为基准（与tag命令保持一致，优先使用changelog）
+            lastTag = findLastTaggedVersion()
+            if not lastTag:
+                logger.warning("No version found, using default version")
+                lastTag = "0.0.0"
+            else:
+                logger.info(f"Found last tagged version: {lastTag}")
+            
+            # 确定新的tag版本
+            if argsInfo.autoGeneratedProjectTag:
+                argsInfo.projectTag = autoGeneratedTagByLastTag(lastTag)
+                logger.info(f"Auto-generated tag: {argsInfo.projectTag}")
+            else:
+                logger.info(f"Using specified tag: {argsInfo.projectTag}")
+            
+            # 获取commit信息用于changelog
+            try:
+                commit_result = subprocess.run(
+                    ["git", "log", "--pretty=format:%s", "--no-merges", f"{lastTag}..HEAD"],
+                    capture_output=True,
+                    text=True,
+                    check=True
+                )
+                commitInfo = commit_result.stdout.strip()
+                if not commitInfo:
+                    commitInfo = f"Release {argsInfo.projectTag}"
+                logger.info(f"Changelog entries: {len(commitInfo.splitlines())} commits")
+            except subprocess.CalledProcessError:
+                commitInfo = f"Release {argsInfo.projectTag}"
+                logger.info("No commit history found, using default changelog entry")
+            
+            # 检查是否存在debian/changelog文件
+            changelog_path = os.path.join(repo_path, "debian", "changelog")
+            if not os.path.exists(changelog_path):
+                logger.warning(f"debian/changelog not found at {changelog_path}")
+                logger.info("Creating debian directory and changelog...")
+                
+                # 创建debian目录
+                debian_dir = os.path.join(repo_path, "debian")
+                if not os.path.exists(debian_dir):
+                    os.makedirs(debian_dir)
+                
+                # 创建基本的changelog文件
+                project_name = argsInfo.projectName or os.path.basename(repo_path)
+                initial_changelog = f"""{project_name} ({argsInfo.projectTag}) unstable; urgency=medium
+
+  * Initial release
+
+ -- {argsInfo.debEmail}  {datetime.now().strftime('%a, %d %b %Y %H:%M:%S %z')}
+"""
+                with open(changelog_path, 'w') as f:
+                    f.write(initial_changelog)
+                logger.info("Created initial debian/changelog")
+            
+            # 更新changelog
+            logger.info("Updating changelog...")
+            
+            # 使用dch命令更新changelog
+            with subprocess.Popen(
+                ["xargs", "-d", "\n", "-I", "{}", "dch", "-v", argsInfo.projectTag, "{}"],
+                stdin=subprocess.PIPE,
+                text=True,
+                cwd=repo_path
+            ) as dch_process:
+                dch_process.communicate(input=commitInfo)
+            
+            # 完成changelog编辑
+            subprocess.run(
+                "dch -r ''",
+                shell=True,
+                check=True,
+                capture_output=True,
+                text=True,
+                cwd=repo_path
+            )
+            
+            logger.info("Changelog updated successfully")
+            
+            # 显示changelog的更改内容
+            if not argsInfo.quiet:
+                print(f"\n📝 Changelog entries for version {argsInfo.projectTag}:")
+                print("=" * 60)
+                # 显示新增的changelog条目
+                changelog_entries = commitInfo.strip().split('\n')
+                for entry in changelog_entries:
+                    if entry.strip():
+                        print(f"  * {entry.strip()}")
+                print("=" * 60)
+            
+            # 提交更改
+            logger.info("Committing changes...")
+            
+            # 添加changelog到暂存区
+            subprocess.run(
+                ["git", "add", "debian/changelog"],
+                check=True,
+                capture_output=True,
+                text=True,
+                cwd=repo_path
+            )
+            
+            # 提交更改
+            commit_message = f"chore: bump version to {argsInfo.projectTag}\n\nupdate changelog to {argsInfo.projectTag}"
+            subprocess.run(
+                ["git", "commit", "-m", commit_message],
+                check=True,
+                capture_output=True,
+                text=True,
+                cwd=repo_path
+            )
+            
+            logger.info(f"✅ Successfully committed changelog update for version {argsInfo.projectTag}")
+            
+            # 显示提交信息
+            show_result = subprocess.run(
+                ["git", "show", "--stat", "HEAD"],
+                capture_output=True,
+                text=True,
+                cwd=repo_path
+            )
+            
+            if not argsInfo.quiet:
+                print(f"\n📋 Commit Details:")
+                print(show_result.stdout)
+            
+            print(f"\n🎉 Local commit completed!")
+            print(f"📂 Repository: {repo_path}")
+            print(f"🏷️  Version: {argsInfo.projectTag}")
+            print(f"💾 Changelog updated and committed locally")
+            
+        finally:
+            # 恢复原始工作目录
+            os.chdir(original_cwd)
+            
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Git command failed: {e}")
+        if e.stderr:
+            logger.error(f"Error output: {e.stderr}")
+        raise SystemExit(1)
+    except Exception as e:
+        logger.error(f"Unexpected error in localCommitTag: {str(e)}")
+        raise SystemExit(1)
+
 def searchProjects():
     """搜索GitHub组织下的项目，支持模糊搜索并按更新时间排序"""
     try:
@@ -817,7 +912,7 @@ def createOrUpdateRepo():
 
 def main(argv):
     parser = argparse.ArgumentParser(description='Pack for CRP.')
-    parser.add_argument('command', nargs='?', default='tag', choices=['tag', 'merge', 'test', 'lasttag', 'release', 'projects'], help='The command type (list or pack)')
+    parser.add_argument('command', nargs='?', default='tag', choices=['tag', 'merge', 'test', 'lasttag', 'release', 'projects', 'tag-local'], help='The command type (list or pack)')
 
     parser.add_argument('--dir', type=str, default=None, help='The project directory')
     parser.add_argument('--org', type=str, default=None, help='The project organization, e.g: linuxdeepin')
@@ -825,6 +920,7 @@ def main(argv):
     parser.add_argument('--branch', type=str, default=None, help='The project branch')
     parser.add_argument('--tag', type=str, default=None, help='The project tag')
     parser.add_argument('--reviewer', type=str, default=[], nargs='+', help='The project reviewers')
+    parser.add_argument('--repo', type=str, default='.', help='Local repository path for tag-local command')
     parser.add_argument('--verbose', action='store_true', help='Show verbose output for git operations')
     parser.add_argument('--quiet', action='store_true', help='Show brief output results')
 
@@ -860,6 +956,9 @@ def main(argv):
     elif (args.command == 'projects'):
         # projects命令不需要createOrUpdateRepo，直接搜索项目
         searchProjects()
+    elif (args.command == 'tag-local'):
+        # tag-local命令在指定的本地仓库中执行，不需要createOrUpdateRepo
+        localCommitTag(args.repo)
     else:
         createOrUpdateRepo()
         if (args.command == 'merge'):
