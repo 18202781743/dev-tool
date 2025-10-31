@@ -154,7 +154,194 @@ def initRepo():
         logger.error(f"Failed to initialize repository: {e.stderr}")
         raise
     
+def findCommitByChangelogBlame(changelog_version):
+    """使用 git blame 和时间信息来查找 changelog 版本对应的提交"""
+    try:
+        # 获取 changelog 版本的详细信息，包括时间
+        changelog_info = subprocess.run(
+            ["dpkg-parsechangelog", "--format", "rfc822"],
+            capture_output=True,
+            text=True
+        )
+        
+        if changelog_info.returncode != 0:
+            logger.warning("Could not get detailed changelog info")
+            return None
+            
+        # 解析 changelog 信息，获取时间戳
+        changelog_lines = changelog_info.stdout.split('\n')
+        changelog_date = None
+        for line in changelog_lines:
+            if line.startswith('Date:'):
+                changelog_date = line.split('Date:', 1)[1].strip()
+                break
+        
+        if not changelog_date:
+            logger.warning("Could not find date in changelog")
+            return None
+            
+        logger.info(f"Found changelog date for {changelog_version}: {changelog_date}")
+        
+        # 解析 changelog 日期为时间戳 (将 RFC2822 格式转换为时间戳)
+        import email.utils
+        try:
+            changelog_timestamp = email.utils.parsedate_to_datetime(changelog_date).timestamp()
+            logger.info(f"Parsed changelog timestamp: {changelog_timestamp}")
+        except Exception as e:
+            logger.warning(f"Could not parse changelog date '{changelog_date}': {e}")
+            # 如果时间解析失败，回退到字符串匹配
+            return _fallbackStringMatch(changelog_version)
+        
+        # 使用 git blame 查找 debian/changelog 文件中包含版本号的行
+        blame_result = subprocess.run(
+            ["git", "blame", "--porcelain", "debian/changelog"],
+            capture_output=True,
+            text=True
+        )
+        
+        if blame_result.returncode != 0:
+            logger.warning("Could not run git blame on debian/changelog")
+            return None
+            
+        # 解析 blame 输出，查找与时间戳最接近的包含版本号的行
+        lines = blame_result.stdout.split('\n')
+        current_commit = None
+        current_author_time = None
+        best_match_commit = None
+        best_time_diff = float('inf')
+        
+        for i, line in enumerate(lines):
+            # porcelain 格式解析
+            if line and not line.startswith('\t'):
+                if ' ' in line:
+                    parts = line.split(' ')
+                    if len(parts) >= 1 and len(parts[0]) == 40 and all(c in '0123456789abcdef' for c in parts[0].lower()):
+                        # 这是一个 commit hash 行
+                        current_commit = parts[0]
+                        current_author_time = None
+                elif line.startswith('author-time ') and current_commit:
+                    # 获取作者时间
+                    try:
+                        current_author_time = int(line.split('author-time ')[1])
+                    except (IndexError, ValueError):
+                        current_author_time = None
+            elif line.startswith('\t') and current_commit and current_author_time:
+                # 这是实际的内容行
+                content = line[1:]  # 去掉开头的 tab
+                # 检查是否包含版本号（在 debian/changelog 格式中）
+                if f"({changelog_version})" in content and ('unstable' in content or 'stable' in content):
+                    # 计算时间差
+                    time_diff = abs(current_author_time - changelog_timestamp)
+                    logger.debug(f"Found potential match: commit {current_commit}, time diff: {time_diff}s")
+                    logger.debug(f"Content: {content.strip()}")
+                    
+                    # 如果时间差更小，更新最佳匹配
+                    if time_diff < best_time_diff:
+                        best_time_diff = time_diff
+                        best_match_commit = current_commit
+                        logger.debug(f"New best match: {current_commit} (time diff: {time_diff}s)")
+        
+        if best_match_commit:
+            logger.info(f"Found best time-matched commit for changelog version {changelog_version}: {best_match_commit}")
+            logger.info(f"Time difference: {best_time_diff}s")
+            return best_match_commit
+        else:
+            logger.warning(f"Could not find time-matched commit for changelog version {changelog_version}")
+            # 回退到字符串匹配
+            return _fallbackStringMatch(changelog_version)
+        
+    except Exception as e:
+        logger.error(f"Error in findCommitByChangelogBlame: {str(e)}")
+        return None
+
+def _fallbackStringMatch(changelog_version):
+    """回退到字符串匹配的方法"""
+    try:
+        logger.info(f"Falling back to string matching for version {changelog_version}")
+        
+        blame_result = subprocess.run(
+            ["git", "blame", "--porcelain", "debian/changelog"],
+            capture_output=True,
+            text=True
+        )
+        
+        if blame_result.returncode != 0:
+            return None
+            
+        lines = blame_result.stdout.split('\n')
+        current_commit = None
+        
+        for i, line in enumerate(lines):
+            if line and not line.startswith('\t') and ' ' in line:
+                parts = line.split(' ')
+                if len(parts) >= 1 and len(parts[0]) == 40 and all(c in '0123456789abcdef' for c in parts[0].lower()):
+                    current_commit = parts[0]
+            elif line.startswith('\t') and current_commit:
+                content = line[1:]
+                if f"({changelog_version})" in content and ('unstable' in content or 'stable' in content):
+                    logger.info(f"Found commit using string match: {current_commit}")
+                    logger.info(f"Matching line: {content.strip()}")
+                    return current_commit
+        
+        return None
+    except Exception as e:
+        logger.error(f"Error in fallback string match: {str(e)}")
+        return None
+        
+    except Exception as e:
+        logger.error(f"Error in findCommitByChangelogBlame: {str(e)}")
+        return None
+
+def findLastTaggedVersion():
+    """查找最新的已经打了tag的版本，优先使用changelog中的版本"""
+    try:
+        # 首先尝试从 changelog 获取版本
+        try:
+            changelog_result = subprocess.run(
+                "dpkg-parsechangelog --show-field Version",
+                shell=True,
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            changelog_version = changelog_result.stdout.strip()
+            logger.info(f"Found version from changelog: {changelog_version}")
+            
+            # 使用 git blame 方法查找对应的提交
+            commit_hash = findCommitByChangelogBlame(changelog_version)
+            if commit_hash:
+                logger.info(f"Found commit for changelog version {changelog_version}: {commit_hash}")
+                # 返回提交hash，用于后续的commit信息获取
+                return commit_hash
+            else:
+                # 如果找不到对应的提交，仍然返回 changelog 版本
+                logger.info(f"Using changelog version as fallback: {changelog_version}")
+                return changelog_version
+            
+        except subprocess.CalledProcessError:
+            logger.warning("Could not get version from changelog, falling back to git tags")
+        
+        # 如果 changelog 方法失败，回退到 git tags
+        tags_result = subprocess.run(
+            ["git", "tag", "-l", "--sort=-version:refname"],
+            capture_output=True,
+            text=True
+        )
+        
+        if tags_result.returncode == 0 and tags_result.stdout.strip():
+            latest_tag = tags_result.stdout.strip().split('\n')[0]
+            logger.info(f"Found latest git tag as fallback: {latest_tag}")
+            return latest_tag
+        else:
+            logger.warning("No git tags found")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Error finding latest tagged version: {str(e)}")
+        return None
+
 def fetchLastTag():
+    """获取最新的已打tag的版本，用于生成下一个版本"""
     try:
         # Fetch from origin
         fetch_result = subprocess.run(
@@ -166,37 +353,93 @@ def fetchLastTag():
         )
         logger.debug(f"Fetch output: {fetch_result.stdout}")
 
-        # Get last tag
-        tag_result = subprocess.run(
+        # 直接获取最新的 git tag
+        latest_tag = findLastTaggedVersion()
+        if latest_tag:
+            logger.info(f"Using latest git tag: {latest_tag}")
+            return latest_tag
+        else:
+            logger.error("Could not find any git tag")
+            return None
+        
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to fetch origin: {e.stderr}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error in fetchLastTag: {str(e)}")
+        return None
+
+def fetchLastGitTag():
+    """从 Git 提交历史获取最新的 tag，用于版本自动生成"""
+    try:
+        # Get last tag from git tags
+        git_tag_result = subprocess.run(
             "git describe --tags --abbrev=0",
             shell=True,
             check=True,
             capture_output=True,
             text=True
         )
-        lastTag = tag_result.stdout.strip()
-        logger.info(f"Found last tag: {lastTag}")
-        return lastTag
+        git_version = git_tag_result.stdout.strip()
+        logger.info(f"Found latest git tag for version generation: {git_version}")
+        return git_version
         
     except subprocess.CalledProcessError as e:
-        logger.error(f"Failed to fetch/get last tag: {e.stderr}")
+        logger.error(f"Failed to get git tag for version generation: {e.stderr}")
         return None
     except Exception as e:
-        logger.error(f"Unexpected error in fetchLastTag: {str(e)}")
+        logger.error(f"Unexpected error in fetchLastGitTag: {str(e)}")
         return None
 
 def autoGeneratedTagByLastTag(lastTag):
+    """根据最新的 tag 生成下一个版本"""
+    # 检查 lastTag 是否是 commit hash（长度为40的十六进制字符串）
+    if len(lastTag) == 40 and all(c in '0123456789abcdef' for c in lastTag.lower()):
+        # lastTag 是 commit hash，需要从 changelog 获取版本号
+        logger.info(f"lastTag appears to be a commit hash: {lastTag}")
+        try:
+            changelog_result = subprocess.run(
+                "dpkg-parsechangelog --show-field Version",
+                shell=True,
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            changelog_version = changelog_result.stdout.strip()
+            logger.info(f"Using changelog version for version generation: {changelog_version}")
+            base_tag = changelog_version
+        except subprocess.CalledProcessError as e:
+            logger.warning(f"Failed to get changelog version, falling back to git tag: {e.stderr}")
+            git_tag = fetchLastGitTag()
+            if git_tag:
+                base_tag = git_tag
+            else:
+                raise ValueError("Could not determine base version for generation")
+    else:
+        # lastTag 是版本号，直接使用
+        logger.info(f"Using provided version for version generation: {lastTag}")
+        base_tag = lastTag
+    
+    # 处理 Debian 版本格式，可能包含 epoch (如 1:6.1.15)
+    epoch = ""
+    version_part = base_tag
+    
+    if ':' in base_tag:
+        epoch_part, version_part = base_tag.split(':', 1)
+        epoch = epoch_part + ":"
+        logger.info(f"Detected Debian epoch format: epoch='{epoch_part}', version='{version_part}'")
+    
     increment_part = 'patch'  # 默认递增部分为 'patch' {major}.{minor}.{patch}
-    parts = lastTag.split('.')
+    parts = version_part.split('.')
     if len(parts) != 3:
-        raise ValueError(f"无效的版本号格式 '{lastTag}'，应为 major.minor.patch")
+        raise ValueError(f"无效的版本号格式 '{version_part}'，应为 major.minor.patch")
 
     try:
         major = int(parts[0])
         minor = int(parts[1])
         patch = int(parts[2])
     except ValueError:
-        raise ValueError(f"版本号各部分必须为整数 '{lastTag}'")
+        raise ValueError(f"版本号各部分必须为整数 '{version_part}'")
         
     if increment_part == 'patch':
         patch += 1
@@ -210,7 +453,9 @@ def autoGeneratedTagByLastTag(lastTag):
     else:
         raise ValueError(f"无效的递增部分 '{increment_part}'，应为 'major', 'minor', 或 'patch'")
 
-    return f"{major}.{minor}.{patch}"
+    new_version = f"{epoch}{major}.{minor}.{patch}"
+    logger.info(f"Generated new version: {new_version} (base: {base_tag})")
+    return new_version
 
 def initTagPR():
     try:
