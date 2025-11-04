@@ -185,6 +185,46 @@ dev-tool batch-git lasttag --config batch-git-config.json
 
 # 🚀 批量触发自动发布
 dev-tool batch-git release --config batch-git-config.json
+
+# 🏷 本地标签管理 (无需远程权限)
+dev-tool git tag-local --repo /path/to/local/repo
+
+# 🏷 在当前目录创建本地标签
+dev-tool git tag-local
+
+# 🏷 指定版本号创建本地标签
+dev-tool git tag-local --repo ~/.cache/git-tag-dir/dtkgui --tag 5.8.0
+
+### 🎯 Tag-Local功能特色
+`tag-local`命令专为本地开发环境设计，无需GitHub权限或远程仓库访问：
+
+**🔧 功能特点：**
+- 📍 **本地操作** - 仅在本地仓库中操作，无需网络权限
+- 🔄 **自动版本递增** - 基于现有changelog自动生成下一版本号
+- 📝 **智能changelog更新** - 自动提取commit信息并更新debian/changelog
+- 🎯 **精确提交匹配** - 使用多种方法精确定位版本对应的提交
+- ⚡ **零配置使用** - 使用默认参数即可在当前目录快速操作
+
+**📋 使用场景：**
+- 🏠 **本地开发** - 在本地开发环境中管理版本标签
+- 🔒 **受限环境** - 无法访问GitHub或需要离线工作时
+- 🧪 **测试验证** - 在提交远程PR前先本地验证changelog生成
+- 📦 **打包准备** - 为本地打包流程准备标准化的changelog
+
+**⚙️ 使用示例：**
+```bash
+# 在当前git仓库中自动生成下一版本
+cd /path/to/your/project
+dev-tool git tag-local
+
+# 在指定仓库中创建特定版本标签  
+dev-tool git tag-local --repo ~/.cache/git-tag-dir/dtkgui --tag 5.8.0
+
+# 显示详细操作过程
+dev-tool git tag-local --repo /path/to/repo --verbose
+
+# 静默模式，只显示关键信息
+dev-tool git tag-local --repo /path/to/repo --quiet
 ```
 
 ### 🎨 图标查找管理
@@ -223,6 +263,12 @@ dev-tool findicon --help
 --branch  分支名称 (默认: master)
 --tag     指定版本号 (不指定则自动递增)
 --reviewer 评审人员 (可多个)
+
+# Git Tag-Local参数
+--repo    本地仓库路径 (默认: 当前目录)
+--tag     指定版本号 (不指定则自动递增)
+--verbose 显示详细输出信息
+--quiet   简要输出结果 (不显示详细信息)
 
 # Git Release参数
 --name    项目名称 (必填)

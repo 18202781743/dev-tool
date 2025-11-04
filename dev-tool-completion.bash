@@ -14,7 +14,7 @@ _dev-tool() {
             return 0
             ;;
         git)
-            COMPREPLY=( $(compgen -W "tag merge test lasttag release projects" -- "$cur") )
+            COMPREPLY=( $(compgen -W "tag merge test lasttag release projects tag-local" -- "$cur") )
             return 0
             ;;
         batch-git)
@@ -70,14 +70,24 @@ _dev-tool_git() {
     _init_completion || return
 
     case $prev in
-        --name|--org|--branch|--tag|--reviewer)
+        --name|--org|--branch|--tag|--reviewer|--repo)
             return 0
             ;;
     esac
 
-    if [[ $cur == -* ]]; then
-        COMPREPLY=( $(compgen -W "--name --org --branch --tag --reviewer --verbose --quiet --help" -- "$cur") )
-    fi
+    # 根据子命令提供不同的参数补全
+    case ${words[2]} in
+        tag-local)
+            if [[ $cur == -* ]]; then
+                COMPREPLY=( $(compgen -W "--repo --tag --verbose --quiet --help" -- "$cur") )
+            fi
+            ;;
+        *)
+            if [[ $cur == -* ]]; then
+                COMPREPLY=( $(compgen -W "--name --org --branch --tag --reviewer --verbose --quiet --help" -- "$cur") )
+            fi
+            ;;
+    esac
 }
 
 _dev-tool_batch_git() {

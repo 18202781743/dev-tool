@@ -70,19 +70,32 @@ _dev-tool() {
                                 'lasttag:Show last git tag'
                                 'release:Trigger Auto Release workflow'
                                 'projects:Search GitHub organization repositories'
+                                'tag-local:Create local git tag without remote permissions'
                             )
                             _describe 'git command' git_commands
                             ;;
                         (git_args)
-                            _arguments \
-                                '--name[Project name]' \
-                                '--org[Organization]' \
-                                '--branch[Branch name]' \
-                                '--tag[Tag name]' \
-                                '--reviewer[Reviewer]' \
-                                '--verbose[Show verbose output]' \
-                                '--quiet[Show brief output results]' \
-                                '--help[Show help]'
+                            case $words[3] in
+                                (tag-local)
+                                    _arguments \
+                                        '--repo[Repository path]:path:_directories' \
+                                        '--tag[Tag name]' \
+                                        '--verbose[Show verbose output]' \
+                                        '--quiet[Show brief output results]' \
+                                        '--help[Show help]'
+                                    ;;
+                                (*)
+                                    _arguments \
+                                        '--name[Project name]' \
+                                        '--org[Organization]' \
+                                        '--branch[Branch name]' \
+                                        '--tag[Tag name]' \
+                                        '--reviewer[Reviewer]' \
+                                        '--verbose[Show verbose output]' \
+                                        '--quiet[Show brief output results]' \
+                                        '--help[Show help]'
+                                    ;;
+                            esac
                             ;;
                     esac
                     ;;
