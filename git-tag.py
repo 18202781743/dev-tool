@@ -808,6 +808,19 @@ def runRelease():
         workflow_cmd = ["gh", "workflow", "run", "Auto Release"]
         if set_default_result.returncode != 0:
             workflow_cmd.extend(["--repo", repo_name])
+        
+        # 添加邮箱参数，使用配置中的维护者邮箱
+        if argsInfo.debEmail:
+            # 从配置的邮箱字符串中提取邮箱地址
+            email_match = re.search(r'<([^>]+)>', argsInfo.debEmail)
+            if email_match:
+                email = email_match.group(1)
+            else:
+                # 如果没有尖括号，直接使用配置的邮箱
+                email = argsInfo.debEmail.strip()
+            
+            workflow_cmd.extend(["-F", f"email={email}"])
+            logger.info(f"Using email for workflow: {email}")
 
         workflow_result = subprocess.run(
             workflow_cmd,

@@ -161,6 +161,7 @@ dev-tool git lasttag --name deepin-desktop-theme-v25
 
 # 🚀 触发自动发布 (使用GitHub Auto Release workflow)
 dev-tool git release --name deepin-desktop-theme-v25 --org linuxdeepin
+# 注意：命令会自动使用配置中的邮箱地址作为工作流的email参数
 
 # 🔍 搜索GitHub组织下的项目 (按更新时间排序)
 dev-tool git projects
@@ -273,6 +274,7 @@ dev-tool findicon --help
 # Git Release参数
 --name    项目名称 (必填)
 --org     组织名称 (默认: linuxdeepin)
+注意：release命令会自动使用配置中的邮箱地址作为工作流参数
 
 # Git Projects参数
 --org     组织名称 (默认配置: linuxdeepin)
