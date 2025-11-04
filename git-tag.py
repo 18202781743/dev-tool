@@ -155,15 +155,221 @@ def initRepo():
         raise
     
 def findCommitByChangelogBlame(changelog_version):
-    """使用 git blame 和时间信息来查找 changelog 版本对应的提交"""
+    """通过 dpkg-parsechangelog 和 git 信息精确查找 changelog 版本对应的提交"""
     try:
-        # 直接使用字符串匹配方法，因为时间戳方法在这里不适用
-        # dpkg-parsechangelog 只能获取当前最新版本的时间戳，而不是历史版本的
-        logger.info(f"Finding commit for changelog version {changelog_version} using string matching")
+        # 获取 changelog 的详细信息
+        changelog_info = subprocess.run(
+            ["dpkg-parsechangelog", "--format", "rfc822"],
+            capture_output=True,
+            text=True
+        )
+        
+        if changelog_info.returncode != 0:
+            logger.warning("Could not get detailed changelog info")
+            return _fallbackStringMatch(changelog_version)
+            
+        # 解析 changelog 信息
+        changelog_lines = changelog_info.stdout.split('\n')
+        changelog_data = {}
+        
+        for line in changelog_lines:
+            if ':' in line and not line.startswith(' '):
+                key, value = line.split(':', 1)
+                changelog_data[key.strip()] = value.strip()
+        
+        logger.info(f"Found changelog data: Version={changelog_data.get('Version')}, Maintainer={changelog_data.get('Maintainer')}")
+        
+        # 方法1: 尝试通过提交信息匹配
+        changes = changelog_data.get('Changes', '')
+        if changes:
+            # 提取可能的提交信息
+            change_lines = changes.strip().split('\n')
+            commit_patterns = []
+            
+            for line in change_lines:
+                line = line.strip()
+                if line.startswith('*'):
+                    # 移除开头的 * 和空格
+                    commit_msg = line[1:].strip()
+                    if commit_msg and len(commit_msg) > 10:  # 过滤太短的信息
+                        commit_patterns.append(commit_msg)
+        
+            logger.info(f"Extracted {len(commit_patterns)} potential commit patterns")
+            
+            # 在 git log 中搜索这些提交信息
+            for pattern in commit_patterns:
+                try:
+                    # 搜索包含这个信息的提交
+                    grep_result = subprocess.run(
+                        ["git", "log", "--grep", pattern, "--format=%H", "-n", "1"],
+                        capture_output=True,
+                        text=True
+                    )
+                    
+                    if grep_result.returncode == 0 and grep_result.stdout.strip():
+                        commit_hash = grep_result.stdout.strip()
+                        logger.info(f"Found commit by grep pattern '{pattern[:50]}...': {commit_hash}")
+                        return commit_hash
+                        
+                except subprocess.CalledProcessError:
+                    continue
+        
+        # 方法2: 尝试通过 Maintainer 信息匹配
+        maintainer = changelog_data.get('Maintainer', '')
+        if maintainer and '<' in maintainer and '>' in maintainer:
+            # 提取邮箱
+            email_match = re.search(r'<([^>]+)>', maintainer)
+            if email_match:
+                email = email_match.group(1)
+                
+                # 查找这个邮箱最近的提交，限制在合理的时间范围内
+                try:
+                    author_result = subprocess.run(
+                        ["git", "log", "--author", email, "--format=%H", "-n", "10", "--since=1 week ago"],
+                        capture_output=True,
+                        text=True
+                    )
+                    
+                    if author_result.returncode == 0 and author_result.stdout.strip():
+                        commits = author_result.stdout.strip().split('\n')
+                        logger.info(f"Found {len(commits)} recent commits by {email}")
+                        
+                        # 检查这些提交是否修改了 debian/changelog
+                        for commit in commits:
+                            try:
+                                files_result = subprocess.run(
+                                    ["git", "show", "--name-only", commit],
+                                    capture_output=True,
+                                    text=True
+                                )
+                                
+                                if 'debian/changelog' in files_result.stdout:
+                                    # 检查这个提交是否包含目标版本
+                                    show_result = subprocess.run(
+                                        ["git", "show", commit, "debian/changelog"],
+                                        capture_output=True,
+                                        text=True
+                                    )
+                                    
+                                    if f"({changelog_version})" in show_result.stdout:
+                                        logger.info(f"Found commit by maintainer and changelog match: {commit}")
+                                        return commit
+                                        
+                            except subprocess.CalledProcessError:
+                                continue
+                                
+                except subprocess.CalledProcessError:
+                    pass
+        
+        # 方法3: 回退到时间戳匹配（但使用更小的阈值）
+        changelog_timestamp = _getVersionTimestamp(changelog_version)
+        if changelog_timestamp is not None:
+            logger.info(f"Trying timestamp matching for {changelog_version}: {changelog_timestamp}")
+            
+            # 使用 git blame 查找最接近的提交
+            blame_result = subprocess.run(
+                ["git", "blame", "--porcelain", "debian/changelog"],
+                capture_output=True,
+                text=True
+            )
+            
+            if blame_result.returncode == 0:
+                lines = blame_result.stdout.split('\n')
+                current_commit = None
+                current_author_time = None
+                best_match_commit = None
+                best_time_diff = float('inf')
+                
+                for i, line in enumerate(lines):
+                    if line and not line.startswith('\t'):
+                        if ' ' in line:
+                            parts = line.split(' ')
+                            if len(parts) >= 1 and len(parts[0]) == 40 and all(c in '0123456789abcdef' for c in parts[0].lower()):
+                                current_commit = parts[0]
+                                current_author_time = None
+                                
+                                # 查找 author-time
+                                for j in range(i+1, min(i+15, len(lines))):
+                                    if lines[j].startswith('author-time '):
+                                        try:
+                                            current_author_time = int(lines[j].split('author-time ')[1])
+                                            break
+                                        except (IndexError, ValueError):
+                                            continue
+                    elif line.startswith('\t') and current_commit:
+                        content = line[1:]
+                        if f"({changelog_version})" in content and ('unstable' in content or 'stable' in content):
+                            if current_author_time:
+                                time_diff = abs(current_author_time - changelog_timestamp)
+                                if time_diff < best_time_diff and time_diff < 300:  # 5分钟的阈值
+                                    best_time_diff = time_diff
+                                    best_match_commit = current_commit
+                                    logger.info(f"Found timestamp match: {current_commit} (time diff: {time_diff}s)")
+                
+                if best_match_commit:
+                    logger.info(f"Found commit by timestamp matching: {best_match_commit}")
+                    return best_match_commit
+        
+        # 方法4: 最后回退到字符串匹配
+        logger.warning(f"All methods failed, falling back to string matching for version {changelog_version}")
         return _fallbackStringMatch(changelog_version)
         
     except Exception as e:
         logger.error(f"Error in findCommitByChangelogBlame: {str(e)}")
+        return _fallbackStringMatch(changelog_version)
+
+def _getVersionTimestamp(version):
+    """从 changelog 文件中解析特定版本的时间戳"""
+    try:
+        # 读取 changelog 文件
+        changelog_path = "debian/changelog"
+        if not os.path.exists(changelog_path):
+            logger.warning(f"Changelog file not found: {changelog_path}")
+            return None
+            
+        with open(changelog_path, 'r') as f:
+            changelog_content = f.read()
+        
+        # 解析 changelog 找到特定版本的时间信息
+        lines = changelog_content.split('\n')
+        in_target_version = False
+        
+        for line in lines:
+            # 检查版本行格式：packagename (version) distribution; urgency=level
+            if f"({version})" in line and ('unstable' in line or 'stable' in line):
+                in_target_version = True
+                continue
+            
+            # 如果在目标版本中，查找时间戳行
+            if in_target_version:
+                # 查找签名行格式： -- Name <email>  Date
+                if line.strip().startswith('--') and '<' in line and '>' in line:
+                    try:
+                        # 提取日期部分
+                        # 格式例子： -- YeShanShan <yeshanshan@uniontech.com>  Fri, 31 Oct 2025 15:51:24 +0800
+                        date_part = line.split('>')[-1].strip()
+                        
+                        # 解析日期字符串转换为时间戳
+                        from email.utils import parsedate_to_datetime
+                        dt = parsedate_to_datetime(date_part)
+                        timestamp = dt.timestamp()
+                        
+                        logger.debug(f"Parsed timestamp for version {version}: {timestamp} from date: {date_part}")
+                        return timestamp
+                        
+                    except Exception as e:
+                        logger.debug(f"Failed to parse date from line: {line.strip()}, error: {e}")
+                        continue
+                
+                # 如果遇到下一个版本，停止搜索
+                elif '(' in line and ')' in line and ('unstable' in line or 'stable' in line):
+                    break
+        
+        logger.warning(f"Could not find timestamp for version {version} in changelog")
+        return None
+        
+    except Exception as e:
+        logger.error(f"Error parsing changelog for version timestamp: {str(e)}")
         return None
 
 def _fallbackStringMatch(changelog_version):
@@ -646,7 +852,7 @@ def localCommitTag(repo_path):
             
         if not os.path.exists(os.path.join(repo_path, '.git')):
             logger.error(f"Not a git repository: {repo_path}")
-            raise SystemExit(1)
+            raise SystemExit(1) 
             
         # 切换到仓库目录
         original_cwd = os.getcwd()
